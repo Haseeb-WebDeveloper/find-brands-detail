@@ -1,0 +1,4 @@
+# Local secrets. Never commit this file.
+.env*.local
+.env
+node_modules/

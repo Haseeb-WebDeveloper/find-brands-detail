@@ -1,0 +1,227 @@
+# Brand Enrich — Design
+
+**Date:** 2026-10-16
+**Status:** Approved in brainstorming, awaiting spec review
+
+## 1. Purpose
+
+Digital Beauty onboards about 25 brands a week. Collecting every field of the db-admin
+Bulk Import CSV by hand takes too long, and a manual audit of 15 brands showed that the
+hand-collected data is often wrong: 3 bad websites (hijacked, parked, offline), more than
+half of the social handles wrong or belonging to impostors, images too small or on links
+that expire within days, and campaign descriptions over the 500-character limit.
+
+Brand Enrich takes a list of brand names, researches every field, checks each value
+against evidence, shows the results live for a person to review, and exports a CSV in
+the exact db-admin Bulk Import template that is guaranteed to pass the importer's
+validation.
+
+**Success criteria**
+
+- On the test set (§10), website and Instagram are correct for every brand that has one,
+  and no rejected trap (§10) is ever auto-accepted.
+- Every field shown to the reviewer carries its evidence in plain words.
+- Every exported CSV passes the db-admin importer's validation and image checks.
+- A reviewer only touches cells marked for review.
+
+## 2. Scope
+
+**In scope (this spec):** website, Instagram, TikTok, logo, cover image, campaigns
+(title, description, image), live review screen, CSV export.
+
+**Out of scope (next spec):** AI drafts of description, industry, aesthetic, tier and
+regions. Until then the reviewer types these on the brand review page; the export
+requires them because the importer does.
+
+**Not built:** individual user accounts, Google Sheets sync, pushing directly into
+db-admin, image hosting (image URLs are kept as found).
+
+## 3. Decisions
+
+| Topic | Decision |
+|---|---|
+| Input | Paste brand names, one per line, optionally `Name, website` |
+| Users | One shared password; no individual accounts or approval history |
+| Campaign definition | Anything with a distinct visual campaign: ambassadors, collaborations, seasonal campaigns, hero product launches with campaign imagery, pop-ups. Skip sales, retail expansion and promotions without imagery |
+| Campaign recency | No age limit; most recent first |
+| Campaign images | Brand-owned sources first (brand site, press pages, brand Instagram); any other source as a fallback, labelled third-party |
+| AI | Gemini with Google Search grounding for research; Groq or Gemini free tier for simple extraction. No Claude |
+| Instagram data | Meta Graph API Business Discovery through the existing Meta app ("Roofing"), plus the free crawler-page check for the verified badge |
+| TikTok data | Free link-preview check; Playwright on a GitHub Actions runner for badge and bio link |
+| Hosting | Vercel (app), Supabase (database, Realtime), Inngest (jobs), GitHub Actions (browser runner) |
+| Images | URLs kept as found; checked at research time and again at export |
+| Live progress | Supabase Realtime |
+
+## 4. Architecture
+
+- **Next.js app on Vercel:** screens (login, new batch, batch view, brand review,
+  export) and API routes.
+- **Supabase Postgres:** batches, brands, candidates, selections, campaigns.
+- **Inngest:** one job per brand made of named steps; each step retries on its own.
+- **GitHub Actions browser runner:** Playwright jobs (TikTok profiles, JavaScript-only
+  sites), dispatched from Inngest, results posted back to an authenticated API route.
+  The runner can move to a machine on a residential connection by changing `runs-on`.
+
+Stack follows `F:\projects\personal\leadforge`: TypeScript, Next.js 16 App Router,
+React 19, Tailwind 4, Zod, pnpm, Drizzle ORM, Vitest.
+
+## 5. Components
+
+Each module has one job and is tested on its own.
+
+| Module | Job | Source |
+|---|---|---|
+| `site-probe` | Is a URL live, parked, hijacked (redirects off-domain) or bot-blocked | leadforge `src/lib/sitecheck/probe.ts`, `classify.ts` |
+| `site-crawl` | Crawl a brand's sites: social links, logo, `og:image`, JSON-LD, about text, regional site links | leadforge `scraper/src/enrich.ts`, `extract.ts` |
+| `archive` | Wayback Machine snapshots when a site is down or hijacked | new |
+| `ig-lookup` | Business Discovery: name, followers, media count, bio website, profile picture, recent posts | new |
+| `ig-badge` | Verified badge from Instagram's crawler-facing profile page | new |
+| `tiktok-lookup` | Link-preview check (existence, name, followers); runner job for badge and bio link | new + leadforge `src/lib/runner/github.ts` |
+| `link-page` | Follow Linktree-style bio links and test whether they reach the brand's domain | new |
+| `image-check` | Download, confirm image, read dimensions, enforce minimums, read Instagram CDN `oe=` expiry | port of db-admin `src/server/images/check-image.ts` |
+| `ai` | Gemini with search grounding and free-tier extraction; output validated with Zod | contractor-sites `src/lib/agent/stream.ts` |
+| `campaigns` | Gemini finds campaigns and source pages; crawler pulls images from source pages; Instagram posts add candidates | new |
+| `scoring` | Apply §7 rules to candidates; choose a selection per field | new |
+| `export` | Build the CSV in the db-admin template and validate with the importer's rules | copy of db-admin `src/lib/schemas/brand-import.ts` |
+
+**Rule for every module:** values are stored as candidates with evidence (source,
+checks performed, result, timestamp). Nothing is shown or exported without a source.
+
+## 6. Data model and flow
+
+**Tables**
+
+- `batches` — id, created_at, status.
+- `brands` — id, batch_id, name, website_hint, status
+  (`queued` → `researching` → `needs_review` → `approved` → `exported`), current_step,
+  review_count.
+- `candidates` — id, brand_id, field (`website`, `instagram`, `tiktok`, `logo`, `cover`),
+  value, source, evidence (JSON), score (`proven` | `review` | `rejected`), reason,
+  created_at.
+- `selections` — brand_id, field, candidate_id or typed value, chosen_by
+  (`auto` | `reviewer`).
+- `campaigns` — id, brand_id, position (1–8), title, description, source_urls,
+  status (`proposed` | `approved` | `removed`).
+- `campaign_images` — id, campaign_id, url, source_kind (`brand` | `third_party`),
+  width, height, score, reason, selected.
+- `brand_text` — brand_id, description, tier, aesthetic, industry, regions
+  (reviewer-entered until the next spec).
+
+**Per-brand job (Inngest steps)**
+
+1. `website` — search, `site-probe`, find regional sites (global, US, Korean).
+2. `crawl` — `site-crawl` on chosen sites; `archive` as fallback.
+3. `instagram` — handles from the site plus name variants → `ig-lookup`, `ig-badge`,
+   `link-page`.
+4. `tiktok` — handles from the site plus name variants → link-preview check → runner
+   job where needed.
+5. `images` — logo and cover candidates from all sources → `image-check`.
+6. `campaigns` — Gemini research → source-page images and Instagram posts →
+   `image-check`.
+7. `score` — apply rules, set selections, set status `needs_review` and review_count.
+
+Steps 3–6 run in parallel after step 2. Concurrency limits per external host (§9).
+
+**Export:** the reviewer selects approved brands and downloads a CSV built from
+selections, campaigns and brand_text. Before download, the export runs the importer's
+validation and re-checks every image URL live; any failure blocks the export with a
+report. Exported brands get status `exported`.
+
+## 7. Scoring rules
+
+**Website**
+- Proven: loads; not parked or for sale; does not redirect to another domain; title or
+  content names the brand.
+- Review: loads but the brand name is not found, or several plausible domains.
+- Rejected: dead, parked, hijacked — reason shown.
+
+**Instagram**
+- Proven: Business Discovery succeeds, **and** (linked from the brand's site **or** the
+  bio link, following link pages, reaches the brand's domain), **and** it is the global
+  account when several exist (name contains "Global" or the global site links it).
+- The verified badge is shown as evidence and is not required.
+- Review: exists but not linked to the brand, or several close candidates.
+- Rejected: not a business account; or follower count tiny relative to other candidates.
+
+**TikTok**
+- Proven: linked from the brand's site, or bio link reaches the brand's domain.
+- Review: found by name only.
+- Rejected: does not exist, or clear impostor (tiny account on the brand's name).
+
+**Logo and cover**
+- Proven: passes `image-check` (logo ≥ 256 px, cover ≥ 800 px) and comes from the
+  brand's site or Instagram.
+- Review: third-party source, or an Instagram CDN link expiring within 7 days.
+- Rejected: below minimum, or not an image.
+
+**Campaigns**
+- Every campaign is reviewed.
+- Images: scored brand-owned or third-party; rejected below 800 px or not an image.
+- Descriptions over 500 characters are rejected and re-requested shorter before review.
+
+## 8. Screens
+
+1. **Login** — shared password (Vercel env var); signed session cookie.
+2. **New batch** — paste box; Research button; live per-brand progress.
+3. **Batch view** — one row per brand, coloured cell per field (green proven, amber
+   review, red missing), "needs you" count, filters.
+4. **Brand review** — per field: chosen value, preview (images shown with the importer's
+   Fill Frame crop), evidence in plain words, other candidates with their evidence,
+   typed override (checked immediately). Campaign cards with title, description and
+   character count, image picks, source links; approve, edit, remove, reorder, "find
+   more". Text fields for description, tier, aesthetic, industry, regions. **Approve
+   brand** is enabled only when every required field has a value and nothing is red.
+5. **Export** — select approved brands → validation and live image re-check →
+   Download CSV, or a report of what blocked it.
+
+**Live updates:** screens subscribe to Supabase Realtime on `brands`, `candidates`,
+`selections`, `campaigns`, `campaign_images`. After password login the server issues a
+short-lived JWT signed with the Supabase JWT secret; row-level security allows reads
+only with that token, so the public anon key alone reads nothing. Writes go through
+server routes only.
+
+## 9. Errors and limits
+
+- Each Inngest step retries. On final failure the field is marked "couldn't check" with
+  the error in plain words and goes to review; a "Retry this step" button re-runs it.
+- Bot checks or blocks are recorded as "blocked", followed by back-off; no value is
+  guessed.
+- Runner jobs have a timeout; a timed-out job marks the step failed and retryable.
+- Meta: long-lived token stored as a server secret; an in-app banner warns before
+  expiry; refresh follows contractor-sites `exchangeForLongLived`.
+- Concurrency: Business Discovery well below Meta's hourly limit; Instagram crawler
+  page, TikTok and each website domain one request at a time with pauses; Gemini calls
+  back off on rate limits. AI cost is logged per brand.
+
+## 10. Testing
+
+- **Unit tests (Vitest):** scoring rules, link extraction, parked and hijack detection,
+  link-page following, `image-check`, CSV export.
+- **Test set:** the 15 brands audited on 2026-10-16 with their correct websites and
+  handles, plus known traps: `pyunkangyul.us` (hijacked), `jumiso.com` (parked),
+  `roundaround.co.kr` (offline), `@tirtir_official` on TikTok (impostor),
+  `@haruharu_wonder` on Instagram (impostor), `@dr.g_official_global` (does not exist).
+  One command runs the pipeline on the set and reports accuracy per field.
+- **Export test:** generated CSV passes the copied importer validation.
+
+## 11. Build order
+
+Each step is usable before the next begins.
+
+1. **Scaffold** — repo, password login, Supabase schema, Inngest, Realtime.
+2. **Facts** — website, crawl, Instagram, TikTok (with runner), logo and cover,
+   scoring; measured on the test set.
+3. **Campaigns** — Gemini research, source-page images, Instagram posts, scoring.
+4. **Review and export** — batch view, brand review, CSV export.
+5. **Next spec** — AI drafts for description, industry, aesthetic, tier, regions.
+
+## 12. Credentials and risks
+
+- **Meta app:** "Roofing" (development mode); lookups run as the Instagram business
+  account `@hommy.online`. A dedicated Instagram business account for this tool is
+  recommended to separate it from the roofing business.
+- **Gemini and Groq keys:** existing keys.
+- **Scraping:** reading public Instagram and TikTok pages is against their terms. Low
+  volume and slow pacing keep the risk low; blocks degrade to review, never to guesses.
+- **Expiring image links:** Instagram CDN links expire in about four days; export
+  re-checks every link and import should follow export promptly.
