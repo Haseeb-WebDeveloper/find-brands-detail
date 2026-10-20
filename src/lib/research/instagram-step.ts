@@ -8,6 +8,7 @@ import { researchInstagram } from "@/lib/instagram/research";
 import { siteRegion, type CheckedSite } from "@/lib/website/research";
 import { registrableDomain } from "@/lib/website/domain";
 import type { PageFacts } from "@/lib/website/extract";
+import type { ResearchLog } from "@/lib/research/log-types";
 
 const json = (value: unknown) => value as Prisma.InputJsonValue;
 const host = (url: string) => new URL(url).hostname.replace(/^www\./, "");
@@ -17,7 +18,7 @@ const host = (url: string) => new URL(url).hostname.replace(/^www\./, "");
  * exception). Reads the pages the website step saved; re-running replaces the Instagram candidates
  * and the auto selection.
  */
-export async function runInstagramStep(brandId: string): Promise<void> {
+export async function runInstagramStep(brandId: string, log: ResearchLog): Promise<void> {
   const brand = await prisma.brand.findUniqueOrThrow({
     where: { id: brandId },
     include: { pages: { where: { source: "live" } }, candidates: { where: { field: "website" } } },
@@ -34,7 +35,7 @@ export async function runInstagramStep(brandId: string): Promise<void> {
   });
 
   // The network work happens before the transaction, so no database connection waits on Meta.
-  const { scored, chosen } = await researchInstagram({ brand: brand.name, pages, brandDomains }, { lookupBusiness, fetchBadge, checkBioLink });
+  const { scored, chosen } = await researchInstagram({ brand: brand.name, pages, brandDomains }, { lookupBusiness, fetchBadge, checkBioLink }, log);
 
   await prisma.$transaction(async (tx) => {
     await tx.selection.deleteMany({ where: { brandId, field: "instagram" } });

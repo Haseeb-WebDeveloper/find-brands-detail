@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
-import { DesignPage } from "@/design/page";
+import { AppPage } from "@/components/app/app-page";
+import { ResearchLog } from "@/components/app/research/research-log";
 import { PageHeader } from "@/design/page-header";
 import { ListGroup, ListRow, Pill } from "@/design/list";
 import { requireMember, scopeCan } from "@/lib/auth/scope";
@@ -44,6 +45,7 @@ async function Brand({ params }: { params: Promise<{ id: string }> }) {
         }
       />
       <LiveRefresh topic={brandTopic(brand.id)} />
+      <div className="flex flex-col gap-8 pb-10">
 
       <section className="flex flex-col gap-2">
         <h2 className="text-headline text-label">Website</h2>
@@ -114,16 +116,19 @@ async function Brand({ params }: { params: Promise<{ id: string }> }) {
         </ListGroup>
         <p className="text-footnote text-label-secondary">TikTok, logo and cover are checked in the next build steps.</p>
       </section>
+
+      <ResearchLog lines={brand.log} live={brand.status === "queued" || brand.status === "researching"} />
+      </div>
     </>
   );
 }
 
 export default function BrandPage({ params }: { params: Promise<{ id: string }> }) {
   return (
-    <DesignPage>
+    <AppPage>
       <Suspense fallback={<RowsLoading count={5} />}>
         <Brand params={params} />
       </Suspense>
-    </DesignPage>
+    </AppPage>
   );
 }

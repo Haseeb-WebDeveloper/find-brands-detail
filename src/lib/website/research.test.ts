@@ -114,10 +114,10 @@ describe("researchWebsite", () => {
     expect(r.chosen?.url).toBe("https://pyunkangyul.com/");
   });
 
-  it("uses Gemini when there is no hint, and chooses nothing when nothing loads", async () => {
+  it("searches the web when there is no hint, and chooses nothing when nothing loads", async () => {
     const d = deps({}, { findOfficialSites: vi.fn(async () => [{ url: "https://dr-g.co.kr", region: "kr" as const }]) });
     const r = await researchWebsite("Dr.G", null, d);
-    expect(d.findOfficialSites).toHaveBeenCalledWith("Dr.G");
+    expect(d.findOfficialSites).toHaveBeenCalledWith("Dr.G", expect.any(Function));
     expect(r.candidates[0].verdict.kind).toBe("unreachable");
     expect(r.chosen).toBeNull();
   });

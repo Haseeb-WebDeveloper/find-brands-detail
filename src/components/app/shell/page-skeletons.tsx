@@ -1,5 +1,5 @@
 import { Skeleton } from "@/components/ui/skeleton";
-import { DesignPage } from "@/design/page";
+import { AppPage as DesignPage } from "@/components/app/app-page";
 import { PageHeader } from "@/design/page-header";
 
 /**
@@ -51,6 +51,27 @@ export function DetailPageLoading() {
     <DesignPage>
       <PageHeader title={<Skeleton className="inline-block h-[1em] w-56 rounded-sm align-text-bottom" />} />
       <FadingRows count={5} step={0.16} />
+    </DesignPage>
+  );
+}
+
+/** Cards in a grid, fading like the rows. For a `<Suspense fallback>` inside a drawn page. */
+export function CardsLoading({ count = 6 }: { count?: number }) {
+  return (
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      {Array.from({ length: count }).map((_, i) => (
+        <Skeleton key={i} className="h-36 w-full rounded-card" style={{ opacity: 1 - i * 0.12 }} />
+      ))}
+    </div>
+  );
+}
+
+/** The home screen: its title, then cards. For `loading.tsx`. */
+export function CardsPageLoading({ title }: { title: string }) {
+  return (
+    <DesignPage>
+      <PageHeader title={title} />
+      <CardsLoading />
     </DesignPage>
   );
 }

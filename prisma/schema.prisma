@@ -126,6 +126,7 @@ model Brand {
   campaigns   Campaign[]
   text        BrandText?
   pages       BrandPage[]
+  logs        ResearchLog[]
 
   @@index([batchId])
   @@map("brands")
@@ -221,4 +222,20 @@ model BrandPage {
 
   @@index([brandId])
   @@map("brand_pages")
+}
+
+/// What the research did, line by line, for the person watching (shown live; plain language).
+model ResearchLog {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  brandId   String   @map("brand_id") @db.Uuid
+  brand     Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  batchId   String   @map("batch_id") @db.Uuid
+  step      String?
+  level     String   @default("info")
+  message   String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([brandId, createdAt])
+  @@index([batchId, createdAt])
+  @@map("research_logs")
 }

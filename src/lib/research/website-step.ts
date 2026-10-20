@@ -5,6 +5,7 @@ import { fetchPage } from "@/lib/website/fetch-page";
 import { latestSnapshot } from "@/lib/website/archive";
 import { findOfficialSites } from "@/lib/website/discover";
 import { researchWebsite, type CheckedSite } from "@/lib/website/research";
+import type { ResearchLog } from "@/lib/research/log-types";
 
 const SOURCE_LABEL: Record<CheckedSite["source"], string> = {
   hint: "Website given in the batch",
@@ -18,10 +19,10 @@ const json = (value: unknown) => value as Prisma.InputJsonValue;
  * Runs inside the Inngest job, so it takes no scope (AGENTS.md rule 2 exception). Re-running it
  * replaces the brand's website candidates, pages and auto selection: research is idempotent.
  */
-export async function runWebsiteStep(brandId: string): Promise<void> {
+export async function runWebsiteStep(brandId: string, log: ResearchLog): Promise<void> {
   const brand = await prisma.brand.findUniqueOrThrow({ where: { id: brandId }, select: { name: true, websiteHint: true } });
   // The network work happens before the transaction, so no database connection waits on a website.
-  const { candidates, chosen } = await researchWebsite(brand.name, brand.websiteHint, { fetchPage, latestSnapshot, findOfficialSites });
+  const { candidates, chosen } = await researchWebsite(brand.name, brand.websiteHint, { fetchPage, latestSnapshot, findOfficialSites }, log);
 
   await prisma.$transaction(async (tx) => {
     await tx.selection.deleteMany({ where: { brandId, field: "website" } });

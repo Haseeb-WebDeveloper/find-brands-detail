@@ -1,7 +1,9 @@
 import { RESEARCH_STEPS, stepNumber } from "@/lib/research/steps";
 import type { BrandRow } from "@/lib/batches/scoped";
 
-export function progressText(row: BrandRow): string {
+type Progress = Pick<BrandRow, "status" | "currentStep" | "reviewCount" | "error">;
+
+export function progressText(row: Progress): string {
   if (row.error) return row.error;
   switch (row.status) {
     case "queued":
@@ -19,7 +21,7 @@ export function progressText(row: BrandRow): string {
   }
 }
 
-export function progressTone(row: BrandRow): "blue" | "green" | "orange" | "red" | "grey" {
+export function progressTone(row: Progress): "blue" | "green" | "orange" | "red" | "grey" {
   if (row.error) return "red";
   switch (row.status) {
     case "queued":

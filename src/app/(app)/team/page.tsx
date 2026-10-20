@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { DesignPage } from "@/design/page";
+import { AppPage } from "@/components/app/app-page";
 import { PageHeader } from "@/design/page-header";
 import { requireMember, scopeCan } from "@/lib/auth/scope";
 import { listTeam } from "@/lib/team/scoped";
@@ -22,8 +22,9 @@ async function Actions() {
 
 export default function TeamPage() {
   return (
-    <DesignPage>
+    <AppPage>
       <PageHeader
+        back={{ href: "/", label: "Batches" }}
         title="Team"
         actions={
           <Suspense fallback={null}>
@@ -34,6 +35,6 @@ export default function TeamPage() {
       <Suspense fallback={<RowsLoading count={3} />}>
         <Team />
       </Suspense>
-    </DesignPage>
+    </AppPage>
   );
 }
