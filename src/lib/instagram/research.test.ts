@@ -64,6 +64,17 @@ describe("researchInstagram", () => {
     expect(r.scored.find((s) => s.candidate.handle === "numbuzin")?.verdict.score).toBe("rejected");
   });
 
+  it("also tries the global handles when the sites link only a regional account", async () => {
+    const d = deps({ tirtir_official: ok("tirtir_official", 387_000), tirtir_global: ok("tirtir_global", 811_000, "TIRTIR Global Official", "https://linktr.ee/TIRTIRGLOBAL") });
+    const r = await researchInstagram(
+      { brand: "TIRTIR", brandDomains: ["tirtir.co.kr"], pages: [{ url: "https://www.tirtir.co.kr", region: "kr", facts: facts(["tirtir_official"]) }] },
+      d,
+    );
+    expect(d.lookupBusiness).toHaveBeenCalledWith("tirtir_global");
+    expect(d.lookupBusiness).not.toHaveBeenCalledWith("tirtir");
+    expect(r.chosen?.handle).toBe("tirtir_global");
+  });
+
   it("never exceeds the lookup budget", async () => {
     const many = Array.from({ length: 12 }, (_, i) => `handle${i}`);
     const d = deps({});

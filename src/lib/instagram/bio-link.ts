@@ -1,5 +1,5 @@
 import * as cheerio from "cheerio";
-import { registrableDomain } from "@/lib/website/domain";
+import { domainMatchesBrand, registrableDomain } from "@/lib/website/domain";
 import { fetchPage } from "@/lib/website/fetch-page";
 
 function domainOf(url: string | null | undefined): string | null {
@@ -11,21 +11,22 @@ function domainOf(url: string | null | undefined): string | null {
   }
 }
 
-/** The brand domain this bio link reaches: the page itself, or a link on it (Linktree-style pages). */
-export function bioReachesBrand(page: { finalUrl: string | null; html: string }, brandDomains: string[]): string | null {
+/**
+ * The brand domain this bio link reaches: the page itself, or a link on it (Linktree-style pages).
+ * One of the brand's checked sites first; failing that, a domain carrying the brand's name — the
+ * global account often links a site the regional research never saw (@tirtir_global → tirtir.us).
+ */
+export function bioReachesBrand(page: { finalUrl: string | null; html: string }, brandDomains: string[], brand: string): string | null {
   const wanted = new Set(brandDomains.map((d) => d.toLowerCase()));
-  const own = domainOf(page.finalUrl);
-  if (own && wanted.has(own)) return own;
   const $ = cheerio.load(page.html);
-  for (const el of $("a[href]").toArray()) {
-    const d = domainOf($(el).attr("href"));
-    if (d && wanted.has(d)) return d;
-  }
-  return null;
+  const domains = [domainOf(page.finalUrl), ...$("a[href]").toArray().map((el) => domainOf($(el).attr("href")))].filter(
+    (d): d is string => Boolean(d),
+  );
+  return domains.find((d) => wanted.has(d)) ?? domains.find((d) => domainMatchesBrand(d, brand)) ?? null;
 }
 
-export async function checkBioLink(website: string | null, brandDomains: string[]): Promise<{ reached: string | null; via: string | null }> {
-  if (!website || brandDomains.length === 0) return { reached: null, via: website };
+export async function checkBioLink(website: string | null, brandDomains: string[], brand: string): Promise<{ reached: string | null; via: string | null }> {
+  if (!website) return { reached: null, via: null };
   const page = await fetchPage(website);
-  return { reached: page.ok ? bioReachesBrand(page, brandDomains) : null, via: website };
+  return { reached: page.ok ? bioReachesBrand(page, brandDomains, brand) : null, via: website };
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { nameVariants } from "@/lib/instagram/variants";
+import { GLOBAL_SUFFIXES, nameVariants } from "@/lib/instagram/variants";
 import { chooseInstagram, scoreInstagram, type IgCandidate } from "@/lib/instagram/score";
 import type { IgProfile } from "@/lib/instagram/discovery";
 
@@ -30,6 +30,8 @@ describe("nameVariants", () => {
   it("builds a few likely handles from the brand name", () => {
     expect(nameVariants("TIRTIR")).toEqual(["tirtir", "tirtir_official", "tirtir_global", "tirtir.global", "tirtir.official"]);
     expect(nameVariants("Dr. Althea")[0]).toBe("dralthea");
+    expect(nameVariants("Dr.G").slice(0, 5)).toEqual(["drg", "dr.g", "dr_g", "drg_official", "dr.g_official"]);
+    expect(nameVariants("TIRTIR", GLOBAL_SUFFIXES)).toEqual(["tirtir_global", "tirtir.global"]);
   });
 });
 
