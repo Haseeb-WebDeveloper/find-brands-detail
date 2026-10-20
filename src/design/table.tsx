@@ -2,7 +2,7 @@
 
 import { Reorder, useDragControls } from "motion/react";
 import Link from "next/link";
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, useContext, useRef, useState, type ReactNode } from "react";
 import { Checkbox } from "./checkbox";
 import { cn } from "./cn";
 import { Icon } from "./icon";
@@ -87,7 +87,13 @@ export function DataTable<T>({
   // While a row is being dragged the order on screen is ours; the server's comes back on the next render.
   const [order, setOrder] = useState(ids);
   const idsKey = ids.join(",");
-  useEffect(() => setOrder(idsKey ? idsKey.split(",") : []), [idsKey]);
+  // When the server's rows change, adopt their order. Adjusted during render rather than in an
+  // effect (React's "adjusting state when a prop changes"), which avoids a second render pass.
+  const [orderKey, setOrderKey] = useState(idsKey);
+  if (orderKey !== idsKey) {
+    setOrderKey(idsKey);
+    setOrder(idsKey ? idsKey.split(",") : []);
+  }
   const shown = reorder ? order.filter((id) => byId.has(id)) : ids;
 
   const template = [
