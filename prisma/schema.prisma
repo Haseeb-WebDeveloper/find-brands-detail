@@ -1,0 +1,207 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  owner
+  member
+
+  @@map("user_role")
+}
+
+enum BatchStatus {
+  active
+  archived
+
+  @@map("batch_status")
+}
+
+enum BrandStatus {
+  queued
+  researching
+  needs_review
+  approved
+  exported
+
+  @@map("brand_status")
+}
+
+enum FieldName {
+  website
+  instagram
+  tiktok
+  logo
+  cover
+
+  @@map("field_name")
+}
+
+enum CandidateScore {
+  proven
+  review
+  rejected
+
+  @@map("candidate_score")
+}
+
+enum ChosenBy {
+  auto
+  reviewer
+
+  @@map("chosen_by")
+}
+
+enum CampaignStatus {
+  proposed
+  approved
+  removed
+
+  @@map("campaign_status")
+}
+
+enum ImageSourceKind {
+  brand
+  third_party
+
+  @@map("image_source_kind")
+}
+
+/// Same id as auth.users.id. Created when an invited email first signs in.
+model User {
+  id              String       @id @db.Uuid
+  email           String       @unique
+  role            UserRole     @default(member)
+  createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  invitationsSent Invitation[] @relation("InvitedBy")
+  batches         Batch[]
+
+  @@map("users")
+}
+
+/// A pending invitation lets a new email create an account; claimed on first sign-in.
+model Invitation {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email       String
+  role        UserRole  @default(member)
+  invitedById String?   @map("invited_by") @db.Uuid
+  invitedBy   User?     @relation("InvitedBy", fields: [invitedById], references: [id], onDelete: SetNull)
+  expiresAt   DateTime  @map("expires_at") @db.Timestamptz(6)
+  acceptedAt  DateTime? @map("accepted_at") @db.Timestamptz(6)
+  revokedAt   DateTime? @map("revoked_at") @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([email])
+  @@map("invitations")
+}
+
+model Batch {
+  id          String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  createdById String?     @map("created_by") @db.Uuid
+  createdBy   User?       @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  status      BatchStatus @default(active)
+  createdAt   DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  brands      Brand[]
+
+  @@map("batches")
+}
+
+model Brand {
+  id          String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  batchId     String      @map("batch_id") @db.Uuid
+  batch       Batch       @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  name        String
+  websiteHint String?     @map("website_hint")
+  status      BrandStatus @default(queued)
+  currentStep String?     @map("current_step")
+  reviewCount Int         @default(0) @map("review_count")
+  error       String?
+  createdAt   DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  candidates  Candidate[]
+  selections  Selection[]
+  campaigns   Campaign[]
+  text        BrandText?
+
+  @@index([batchId])
+  @@map("brands")
+}
+
+model Candidate {
+  id         String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  brandId    String         @map("brand_id") @db.Uuid
+  brand      Brand          @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  field      FieldName
+  value      String
+  source     String
+  evidence   Json           @default("{}")
+  score      CandidateScore
+  reason     String
+  createdAt  DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  selections Selection[]
+
+  @@index([brandId])
+  @@map("candidates")
+}
+
+model Selection {
+  brandId     String     @map("brand_id") @db.Uuid
+  brand       Brand      @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  field       FieldName
+  candidateId String?    @map("candidate_id") @db.Uuid
+  candidate   Candidate? @relation(fields: [candidateId], references: [id], onDelete: SetNull)
+  typedValue  String?    @map("typed_value")
+  chosenBy    ChosenBy   @map("chosen_by")
+
+  @@id([brandId, field])
+  @@map("selections")
+}
+
+model Campaign {
+  id          String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  brandId     String          @map("brand_id") @db.Uuid
+  brand       Brand           @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  position    Int
+  title       String
+  description String
+  sourceUrls  Json            @default("[]") @map("source_urls")
+  status      CampaignStatus  @default(proposed)
+  createdAt   DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  images      CampaignImage[]
+
+  @@index([brandId])
+  @@map("campaigns")
+}
+
+model CampaignImage {
+  id         String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  campaignId String          @map("campaign_id") @db.Uuid
+  campaign   Campaign        @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  url        String
+  sourceKind ImageSourceKind @map("source_kind")
+  width      Int?
+  height     Int?
+  score      CandidateScore
+  reason     String
+  selected   Boolean         @default(false)
+
+  @@index([campaignId])
+  @@map("campaign_images")
+}
+
+/// Reviewer-entered until the AI-drafts spec.
+model BrandText {
+  brandId     String   @id @map("brand_id") @db.Uuid
+  brand       Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  description String?
+  tier        String?
+  aesthetic   String?
+  industry    String?
+  regions     String?
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("brand_text")
+}
