@@ -17,6 +17,7 @@
     "db:migrate:deploy": "prisma migrate deploy",
     "bootstrap": "tsx scripts/bootstrap-owner.ts",
     "verify:lockdown": "tsx scripts/verify-lockdown.ts",
+    "verify:realtime": "tsx scripts/verify-realtime.ts",
     "inngest:dev": "pnpm dlx inngest-cli@latest dev -u http://localhost:3005/api/inngest"
   },
   "dependencies": {

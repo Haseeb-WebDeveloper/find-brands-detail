@@ -9,7 +9,9 @@ Design: `docs/superpowers/specs/2026-10-16-brand-enrich-design.md`. Rules: `AGEN
 2. **Supabase → Authentication → URL Configuration:** Site URL `http://localhost:3005`; add
    `http://localhost:3005/**` to Redirect URLs (the magic link returns to `/auth/callback`).
    Port 3005 because 3000/3001 are often taken by other local apps; `pnpm dev` pins it.
-3. **Supabase → Realtime → Settings:** turn off "Allow public access" so only private channels work.
+3. **Realtime (optional hardening):** if your dashboard shows Realtime → Settings → "Allow public
+   access", turn it off. Not required: the app only uses private channels, and
+   `pnpm verify:realtime` proves a signed-out browser is refused by policy.
 4. `pnpm install`
 5. `pnpm db:migrate:deploy` (schema, then lockdown), then `pnpm verify:lockdown`.
 6. `pnpm bootstrap you@company.com` — the first owner's invitation.
@@ -28,4 +30,4 @@ Design: `docs/superpowers/specs/2026-10-16-brand-enrich-design.md`. Rules: `AGEN
 ## Commands
 
 `pnpm test` · `pnpm typecheck` · `pnpm lint` · `pnpm build` · `pnpm db:migrate` ·
-`pnpm db:migrate:deploy` · `pnpm verify:lockdown` · `pnpm bootstrap <email>` · `pnpm inngest:dev`
+`pnpm db:migrate:deploy` · `pnpm verify:lockdown` · `pnpm verify:realtime` · `pnpm bootstrap <email>` · `pnpm inngest:dev`
