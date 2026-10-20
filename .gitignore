@@ -1,4 +1,7 @@
-# Local secrets. Never commit this file.
+# Local secrets. Never commit these.
 .env*.local
 .env
 node_modules/
+.next/
+*.tsbuildinfo
+next-env.d.ts

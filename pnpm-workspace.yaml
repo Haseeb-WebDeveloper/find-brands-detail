@@ -1,0 +1,12 @@
+allowBuilds:
+  esbuild: true
+  prisma: true
+  "@prisma/engines": true
+  # Arrives transitively with Inngest (OpenTelemetry gRPC exporters); its postinstall is not needed.
+  protobufjs: false
+  unrs-resolver: true
+
+onlyBuiltDependencies:
+  - prisma
+  - "@prisma/engines"
+  - unrs-resolver
