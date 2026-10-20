@@ -20,7 +20,7 @@ Instagram bio pages (Linktree and similar) list the TikTok account for 11 of the
 
 - All scaffold, 2a and 2b constraints apply (`AGENTS.md`). No schema change: `FieldName` already has `tiktok`.
 - TikTok verdicts per spec §7: **proven** = linked from the brand's site, or from the brand's chosen Instagram account's bio page, or the TikTok bio link reaches the brand's domain, or the TikTok bio link is the same page as the Instagram bio link. **review** = found by name only, or couldn't check (blocked). **rejected** = does not exist, or followers under 5% of the largest candidate's, or found by name only with under 100 followers (impostor; added after the first live run picked an 18-follower @roundaround_official).
-- TikTok requests: one at a time, 3 s apart, at most 8 profile lookups per brand; after a blocked lookup, no more name variants are tried for that brand.
+- TikTok requests: one at a time, 3 s apart, at most 8 profile lookups per brand; a blocked lookup is retried once after 8 s; after a lookup stays blocked, no more name variants are tried for that brand, and a guessed name that couldn't be read is never chosen.
 - Choosing between proven accounts: linked from a global page (the brand's global site, or the global Instagram account's bio page) first, then a name containing "global", then most followers.
 - Log lines in plain language for a non-technical reader; no tool names or status codes.
 

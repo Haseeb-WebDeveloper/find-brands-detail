@@ -18,6 +18,7 @@ const NOT_FOUND = 10221;
 /** Googlebot gets 403 and link-preview bots get a stub; a desktop browser gets the profile data. */
 const CHROME = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36";
 const PAUSE_MS = 3_000;
+const RETRY_PAUSE_MS = 8_000;
 
 const BLOCKED = { ok: false, reason: "blocked", message: "TikTok didn't show the profile, so it couldn't be checked." } as const;
 
@@ -93,8 +94,15 @@ function getPage(path: string): Promise<{ status: number; html: string }> {
 
 let last = 0;
 
-/** Paced, one at a time, never throws: any failure is "blocked". */
+/** Paced, one at a time, never throws: any failure is "blocked". A block is tried once more, slower. */
 export async function lookupProfile(username: string): Promise<TtLookup> {
+  const first = await lookupOnce(username);
+  if (first.ok || first.reason !== "blocked") return first;
+  await new Promise((r) => setTimeout(r, RETRY_PAUSE_MS));
+  return lookupOnce(username);
+}
+
+async function lookupOnce(username: string): Promise<TtLookup> {
   const wait = last + PAUSE_MS - Date.now();
   if (wait > 0) await new Promise((r) => setTimeout(r, wait));
   last = Date.now();

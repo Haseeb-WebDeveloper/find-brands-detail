@@ -63,7 +63,10 @@ const followers = (c: TtCandidate) => (c.lookup.ok ? c.lookup.profile.followers 
 const fromGlobal = (c: TtCandidate) => c.foundOn.some((f) => f.region === "global");
 const namedGlobal = (c: TtCandidate) => (c.lookup.ok ? /global/i.test(`${c.lookup.profile.name ?? ""} ${c.handle}`) : false);
 
-/** Global link first, then a "Global" name, then followers — the Instagram rule (Global Constraints). */
+/**
+ * Global link first, then a "Global" name, then followers — the Instagram rule (Global Constraints).
+ * An account that couldn't be read and that nothing links is never chosen: it is only a guessed name.
+ */
 export function chooseTiktok(scored: { candidate: TtCandidate; verdict: TtVerdict }[]): TtCandidate | null {
   const rank = (c: TtCandidate) => [fromGlobal(c) ? 0 : 1, namedGlobal(c) ? 0 : 1, -followers(c)];
   const better = (a: TtCandidate, b: TtCandidate) => {
@@ -72,7 +75,7 @@ export function chooseTiktok(scored: { candidate: TtCandidate; verdict: TtVerdic
     return false;
   };
   for (const level of ["proven", "review"] as const) {
-    const pool = scored.filter((s) => s.verdict.score === level).map((s) => s.candidate);
+    const pool = scored.filter((s) => s.verdict.score === level && (s.candidate.lookup.ok || s.candidate.foundOn.length > 0)).map((s) => s.candidate);
     if (pool.length > 0) return pool.reduce((best, c) => (better(c, best) ? c : best));
   }
   return null;

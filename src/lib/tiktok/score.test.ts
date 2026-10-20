@@ -69,6 +69,14 @@ describe("chooseTiktok", () => {
     expect(chooseTiktok(scored)?.handle).toBe("brand.global");
   });
 
+  it("never chooses a guessed name that couldn't be read, but keeps a linked one", () => {
+    const blocked = { ok: false, reason: "blocked", message: "x" } as const;
+    const guess = cand("roundaround_official", { lookup: blocked });
+    expect(chooseTiktok([{ candidate: guess, verdict: scoreTiktok(guess, 0) }])).toBeNull();
+    const linked = cand("dr.g_global", { lookup: blocked, foundOn: [{ url: "https://linktr.ee/drg_global", region: "global", kind: "instagram-bio" }] });
+    expect(chooseTiktok([{ candidate: linked, verdict: scoreTiktok(linked, 0) }])?.handle).toBe("dr.g_global");
+  });
+
   it("falls back to review candidates and returns null when all are rejected", () => {
     const r = cand("benton");
     expect(chooseTiktok([{ candidate: r, verdict: { score: "review", reason: "" } }])?.handle).toBe("benton");
