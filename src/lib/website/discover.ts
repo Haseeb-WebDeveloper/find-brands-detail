@@ -52,14 +52,24 @@ const SEARCHERS: { label: string; ready: () => boolean; run: (brand: string) => 
     run: async (brand) => {
       const { generateText } = await import("ai");
       const { groq } = await import("@ai-sdk/groq");
-      const { text } = await generateText({
-        model: groq("openai/gpt-oss-120b"),
-        tools: { browser_search: groq.tools.browserSearch({}) },
-        providerOptions: { groq: { reasoningEffort: "medium", reasoningFormat: "hidden" } },
-        abortSignal: AbortSignal.timeout(120_000),
-        prompt: PROMPT(brand),
-      });
-      return text;
+      const ask = async () =>
+        (
+          await generateText({
+            model: groq("openai/gpt-oss-120b"),
+            tools: { browser_search: groq.tools.browserSearch({}) },
+            providerOptions: { groq: { reasoningEffort: "medium", reasoningFormat: "hidden" } },
+            abortSignal: AbortSignal.timeout(120_000),
+            prompt: PROMPT(brand),
+          })
+        ).text;
+      try {
+        return await ask();
+      } catch (error) {
+        // The model now and then calls a tool that doesn't exist ("json"), which Groq rejects
+        // outright. A second try almost always answers.
+        if (!/tool call validation failed/i.test(error instanceof Error ? error.message : String(error))) throw error;
+        return ask();
+      }
     },
   },
   {

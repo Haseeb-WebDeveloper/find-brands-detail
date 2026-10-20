@@ -1,3 +1,4 @@
+import http2 from "node:http2";
 import * as cheerio from "cheerio";
 
 export type TtProfile = {
@@ -59,6 +60,37 @@ export function parseProfile(html: string, username: string): TtLookup {
   };
 }
 
+const TIMEOUT_MS = 20_000;
+const MAX_BYTES = 2_000_000;
+
+/**
+ * One page over HTTP/2. Not `fetch`: TikTok answers Node's fetch (its extra browser-style headers)
+ * with a bot-check page, but serves the profile to a plain HTTP/2 request (probed 2026-10-20).
+ */
+function getPage(path: string): Promise<{ status: number; html: string }> {
+  return new Promise((resolve, reject) => {
+    const session = http2.connect("https://www.tiktok.com");
+    const timer = setTimeout(() => session.destroy(new Error("timeout")), TIMEOUT_MS);
+    const done = (fn: () => void) => {
+      clearTimeout(timer);
+      session.close();
+      fn();
+    };
+    session.on("error", (e) => done(() => reject(e)));
+    const req = session.request({ ":path": path, "user-agent": CHROME, "accept-language": "en-US,en;q=0.9", accept: "text/html" });
+    let status = 0;
+    let html = "";
+    req.setEncoding("utf8");
+    req.on("response", (headers) => (status = Number(headers[":status"])));
+    req.on("data", (chunk: string) => {
+      if (html.length < MAX_BYTES) html += chunk;
+    });
+    req.on("end", () => done(() => resolve({ status, html })));
+    req.on("error", (e) => done(() => reject(e)));
+    req.end();
+  });
+}
+
 let last = 0;
 
 /** Paced, one at a time, never throws: any failure is "blocked". */
@@ -67,12 +99,8 @@ export async function lookupProfile(username: string): Promise<TtLookup> {
   if (wait > 0) await new Promise((r) => setTimeout(r, wait));
   last = Date.now();
   try {
-    const res = await fetch(`https://www.tiktok.com/@${encodeURIComponent(username)}`, {
-      headers: { "user-agent": CHROME, "accept-language": "en-US,en;q=0.9", accept: "text/html" },
-      signal: AbortSignal.timeout(20_000),
-    });
-    if (!res.ok) return BLOCKED;
-    return parseProfile(await res.text(), username);
+    const { status, html } = await getPage(`/@${encodeURIComponent(username)}`);
+    return status === 200 ? parseProfile(html, username) : BLOCKED;
   } catch {
     return BLOCKED;
   }
