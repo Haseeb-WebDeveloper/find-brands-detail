@@ -5,17 +5,18 @@ import { failResearch, finishResearch, markStep } from "@/lib/brands/store";
 import { clearResearchLog, researchLogger } from "@/lib/research/log";
 import { runWebsiteStep } from "@/lib/research/website-step";
 import { runInstagramStep } from "@/lib/research/instagram-step";
+import { runTiktokStep } from "@/lib/research/tiktok-step";
 
 /** The steps with real work so far; the rest are announced and skipped until their build lands. */
 const RUNNERS: Partial<Record<ResearchStepId, typeof runWebsiteStep>> = {
   website: runWebsiteStep,
   instagram: runInstagramStep,
+  tiktok: runTiktokStep,
 };
 
 /** The crawl happens inside the website step (it reads the regional sites it finds). */
 const NOT_YET: Partial<Record<ResearchStepId, string>> = {
   crawl: "Brand sites were read with the website.",
-  tiktok: "TikTok checks come in the next build.",
   images: "Logo and cover checks come in a later build.",
   campaigns: "Campaign research comes in a later build.",
   score: "Scoring comes in a later build.",

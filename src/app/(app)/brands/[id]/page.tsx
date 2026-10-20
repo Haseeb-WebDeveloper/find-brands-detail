@@ -28,7 +28,6 @@ async function Brand({ params }: { params: Promise<{ id: string }> }) {
 
   const live = brand.pages.filter((p) => p.source === "live");
   const archived = brand.pages.filter((p) => p.source === "archive");
-  const found = (key: "tiktok") => [...new Set(brand.pages.flatMap((p) => p.facts[key] ?? []))];
 
   return (
     <>
@@ -109,12 +108,54 @@ async function Brand({ params }: { params: Promise<{ id: string }> }) {
       </section>
 
       <section className="flex flex-col gap-2">
-        <h2 className="text-headline text-label">Found on the brand&apos;s sites</h2>
+        <h2 className="text-headline text-label">TikTok</h2>
+        {brand.tiktok.candidates.length === 0 ? (
+          <p className="text-callout text-label-secondary">No TikTok account checked yet.</p>
+        ) : (
+          <ListGroup>
+            {brand.tiktok.candidates.map((c, i) => {
+              const e = c.evidence as {
+                followers?: number | null;
+                name?: string | null;
+                verified?: boolean | null;
+                private?: boolean | null;
+                bioReached?: string | null;
+                sameBioAsInstagram?: boolean;
+              };
+              const facts = [
+                e.name,
+                typeof e.followers === "number" ? `${e.followers.toLocaleString("en-US")} followers` : null,
+                e.verified === true ? "verified badge" : e.verified === false ? "no badge" : null,
+                e.private ? "private account" : null,
+                e.bioReached ? `bio reaches ${e.bioReached}` : e.sameBioAsInstagram ? "same bio link as Instagram" : null,
+              ].filter(Boolean);
+              return (
+                <ListRow
+                  key={c.id}
+                  first={i === 0}
+                  title={
+                    <span className="flex items-center gap-2">
+                      {c.id === brand.tiktok.selectedCandidateId ? <Pill tone="blue">Chosen</Pill> : null}
+                      <Link href={`https://www.tiktok.com/@${c.value}`} target="_blank" rel="noreferrer" className="underline-offset-4 hover:underline">
+                        @{c.value}
+                      </Link>
+                    </span>
+                  }
+                  detail={`${c.reason} · ${c.source}${facts.length ? ` · ${facts.join(" · ")}` : ""}`}
+                  trailing={<Pill tone={TONE[c.score]}>{LABEL[c.score]}</Pill>}
+                />
+              );
+            })}
+          </ListGroup>
+        )}
+      </section>
+
+      <section className="flex flex-col gap-2">
+        <h2 className="text-headline text-label">Pages read</h2>
         <ListGroup>
-          <ListRow first title="TikTok" detail={found("tiktok").map((h) => `@${h}`).join(", ") || "None linked"} />
-          <ListRow title="Pages read" detail={`${live.length} live${archived.length ? `, ${archived.length} from the Wayback Machine` : ""}`} />
+          <ListRow first title="Brand sites" detail={`${live.length} live${archived.length ? `, ${archived.length} from the Wayback Machine` : ""}`} />
         </ListGroup>
-        <p className="text-footnote text-label-secondary">TikTok, logo and cover are checked in the next build steps.</p>
+        <p className="text-footnote text-label-secondary">Logo and cover are checked in the next build step.</p>
       </section>
 
       <ResearchLog lines={brand.log} live={brand.status === "queued" || brand.status === "researching"} />

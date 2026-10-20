@@ -5,9 +5,7 @@ import { lookupBusiness } from "@/lib/instagram/discovery";
 import { fetchBadge } from "@/lib/instagram/badge";
 import { checkBioLink } from "@/lib/instagram/bio-link";
 import { researchInstagram } from "@/lib/instagram/research";
-import { siteRegion, type CheckedSite } from "@/lib/website/research";
-import { registrableDomain } from "@/lib/website/domain";
-import type { PageFacts } from "@/lib/website/extract";
+import { loadResearchPages } from "@/lib/research/pages";
 import type { ResearchLog } from "@/lib/research/log-types";
 
 const json = (value: unknown) => value as Prisma.InputJsonValue;
@@ -19,23 +17,10 @@ const host = (url: string) => new URL(url).hostname.replace(/^www\./, "");
  * and the auto selection.
  */
 export async function runInstagramStep(brandId: string, log: ResearchLog): Promise<void> {
-  const brand = await prisma.brand.findUniqueOrThrow({
-    where: { id: brandId },
-    include: { pages: { where: { source: "live" } }, candidates: { where: { field: "website" } } },
-  });
-
-  const brandDomains = [
-    ...new Set(brand.candidates.filter((c) => c.score !== "rejected").map((c) => registrableDomain(new URL(c.value).hostname))),
-  ];
-  const pages = brand.pages.map((p) => {
-    const facts = p.facts as PageFacts;
-    // siteRegion reads only the site's URL and facts; a minimal CheckedSite carries both.
-    const site = { url: p.url, source: "hint", verdict: { score: "proven", kind: "ok", reason: "", siteUrl: p.url }, facts, archive: null } as CheckedSite;
-    return { url: p.url, region: siteRegion(site), facts };
-  });
+  const { name, pages, brandDomains } = await loadResearchPages(brandId);
 
   // The network work happens before the transaction, so no database connection waits on Meta.
-  const { scored, chosen } = await researchInstagram({ brand: brand.name, pages, brandDomains }, { lookupBusiness, fetchBadge, checkBioLink }, log);
+  const { scored, chosen } = await researchInstagram({ brand: name, pages, brandDomains }, { lookupBusiness, fetchBadge, checkBioLink }, log);
 
   await prisma.$transaction(async (tx) => {
     await tx.selection.deleteMany({ where: { brandId, field: "instagram" } });
