@@ -9,6 +9,8 @@ export type PageFacts = {
   instagram: string[];
   tiktok: string[];
   regionalSites: string[];
+  /** Primary language subtag of <html lang> ("ja" from "ja-JP"), lowercase; null when absent. */
+  lang: string | null;
   ogImage: string | null;
   icons: string[];
   logoImages: string[];
@@ -100,6 +102,7 @@ export function extractFacts(html: string, pageUrl: string, brand: string): Page
     instagram: handles(raw, IG_RE, IG_RESERVED),
     tiktok: handles(raw, TT_RE),
     regionalSites: [...regional],
+    lang: $("html").attr("lang")?.trim().toLowerCase().split(/[-_]/)[0] || null,
     ogImage: absolute($('meta[property="og:image"]').attr("content"), pageUrl),
     icons: [...new Set(icons)],
     logoImages: [...new Set(logoImages)],

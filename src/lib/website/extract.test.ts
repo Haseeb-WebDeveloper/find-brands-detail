@@ -23,6 +23,11 @@ const html = `<!doctype html><html><head>
 describe("extractFacts", () => {
   const facts = extractFacts(html, "https://tirtir.global/", "TIRTIR");
 
+  it("reads the page language", () => {
+    expect(facts.lang).toBeNull();
+    expect(extractFacts("<html lang=\"ja-JP\"><head></head></html>", "https://klairs.co.jp/", "Dear, Klairs").lang).toBe("ja");
+  });
+
   it("reads title, site name, description", () => {
     expect(facts).toMatchObject({ title: "TIRTIR Global Official", siteName: "TIRTIR", description: "Mask Fit cushions" });
   });

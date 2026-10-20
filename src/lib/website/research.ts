@@ -42,8 +42,44 @@ async function check(brand: string, url: string, source: CheckedSite["source"], 
   return { url, source, verdict, facts, archive };
 }
 
+/** Hangul syllables or jamo: a Korean-language page. */
+const HANGUL = /[ᄀ-ᇿ㄰-㆏가-힯]/;
+
+/**
+ * Which market a site serves. The page language decides first (a Korean or Japanese page is not
+ * the global site, whatever its domain), then the host. English, or no stated language on a
+ * generic domain, is global.
+ */
+export function siteRegion(site: CheckedSite): "global" | "us" | "kr" | "other" {
+  let host = "";
+  try {
+    host = new URL(site.verdict.siteUrl).hostname.toLowerCase();
+  } catch {
+    host = site.url.toLowerCase();
+  }
+  const lang = site.facts?.lang ?? null;
+  if (lang === "ko" || host.endsWith(".kr") || HANGUL.test(site.facts?.title ?? "")) return "kr";
+  if (lang && lang !== "en") return "other";
+  if (host.endsWith(".us") || host.startsWith("us.") || /(^|[.-])usa?([.-]|$)/.test(host.split(".").slice(0, -1).join("."))) return "us";
+  // A country-code domain that isn't US or Korean (".jp", ".pl", ".co.uk") serves that country.
+  const tld = host.split(".").pop() ?? "";
+  if (tld.length === 2 && tld !== "us") return "other";
+  return "global";
+}
+
+const REGION_RANK = { global: 0, us: 1, kr: 2, other: 3 } as const;
+
+/**
+ * Proven beats needs-a-look; within proven, the global site beats the US site beats the Korean one
+ * beats any other country's — the same "global account first" rule as Instagram (spec §7). Ties
+ * keep discovery order.
+ */
 export function chooseSite(candidates: CheckedSite[]): CheckedSite | null {
-  return candidates.find((c) => c.verdict.score === "proven") ?? candidates.find((c) => c.verdict.score === "review") ?? null;
+  const proven = candidates.filter((c) => c.verdict.score === "proven");
+  if (proven.length > 0) {
+    return proven.reduce((best, c) => (REGION_RANK[siteRegion(c)] < REGION_RANK[siteRegion(best)] ? c : best));
+  }
+  return candidates.find((c) => c.verdict.score === "review") ?? null;
 }
 
 export async function researchWebsite(brand: string, hint: string | null, deps: WebsiteDeps): Promise<WebsiteResearch> {

@@ -148,6 +148,9 @@ report. Exported brands get status `exported`.
   content names the brand.
 - Review: loads but the brand name is not found, or several plausible domains.
 - Rejected: dead, parked, hijacked — reason shown.
+- Several proven official sites (added 2026-10-21): prefer the global site (English or generic
+  domain), then US, then Korean, then any other country; all stay listed as candidates. Region is
+  read from the page language first, then the domain.
 
 **Instagram**
 - Proven: Business Discovery succeeds, **and** (linked from the brand's site **or** the
