@@ -2,6 +2,7 @@ import { inngest } from "@/lib/inngest/client";
 import { brandResearchRequested } from "@/lib/inngest/events";
 import { RESEARCH_STEPS } from "@/lib/research/steps";
 import { failResearch, finishResearch, markStep } from "@/lib/brands/store";
+import { runWebsiteStep } from "@/lib/research/website-step";
 
 /**
  * One job per brand. Each research step is its own Inngest step so a failure retries only that
@@ -22,9 +23,14 @@ export const researchBrand = inngest.createFunction(
   async ({ event, step }) => {
     const { brandId } = brandResearchRequested.schema.parse(event.data);
     for (const { id } of RESEARCH_STEPS) {
-      await step.run(`step:${id}`, () => markStep(brandId, id));
-      // Placeholder pacing so progress is visible while the steps are empty.
-      await step.sleep(`pause:${id}`, "1s");
+      await step.run(`step:${id}`, async () => {
+        await markStep(brandId, id);
+        // Real work so far: the website (which also reads the regional sites — the crawl). The
+        // other steps are still placeholders; later plans fill them in.
+        if (id === "website") await runWebsiteStep(brandId);
+      });
+      // Placeholder pacing so progress is visible while the remaining steps are empty.
+      if (id !== "website") await step.sleep(`pause:${id}`, "1s");
     }
     await step.run("finish", () => finishResearch(brandId));
     return { brandId };

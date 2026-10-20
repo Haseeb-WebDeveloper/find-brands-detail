@@ -8,7 +8,7 @@ config({ path: ".env.local" });
 
 const TABLES = [
   "users", "invitations", "batches", "brands", "candidates",
-  "selections", "campaigns", "campaign_images", "brand_text",
+  "selections", "campaigns", "campaign_images", "brand_text", "brand_pages",
 ];
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;

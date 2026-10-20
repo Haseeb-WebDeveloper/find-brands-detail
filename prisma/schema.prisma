@@ -125,6 +125,7 @@ model Brand {
   selections  Selection[]
   campaigns   Campaign[]
   text        BrandText?
+  pages       BrandPage[]
 
   @@index([batchId])
   @@map("brands")
@@ -204,4 +205,20 @@ model BrandText {
   updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   @@map("brand_text")
+}
+
+/// What the crawl found on one page of a brand's site, live or from the Wayback Machine.
+model BrandPage {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  brandId     String   @map("brand_id") @db.Uuid
+  brand       Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  url         String
+  source      String
+  archivedAt  String?  @map("archived_at")
+  verdictKind String   @map("verdict_kind")
+  facts       Json     @default("{}")
+  fetchedAt   DateTime @default(now()) @map("fetched_at") @db.Timestamptz(6)
+
+  @@index([brandId])
+  @@map("brand_pages")
 }

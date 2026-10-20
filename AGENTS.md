@@ -13,9 +13,13 @@ read `node_modules/next/dist/docs/` before writing Next code.
 4. Realtime payloads carry ids only; the page calls `router.refresh()` and re-reads on the server.
 5. Every new table: repeat the lockdown block from the `lockdown` migration in the same migration,
    then run `pnpm verify:lockdown`. Never rely on `ALTER DEFAULT PRIVILEGES`.
-6. Schema changes: `pnpm db:migrate --name <x>` for Prisma-generated SQL. Hand-written SQL that
-   touches Supabase's `auth`/`realtime` schemas: `pnpm db:migrate --create-only --name <x>`, edit,
-   then `pnpm db:migrate:deploy` — `migrate dev`'s shadow database has no Supabase schemas.
+6. Schema changes NEVER use `pnpm db:migrate` (`migrate dev`): it replays every migration into a
+   shadow database that has no Supabase `auth`/`realtime` schemas, and the lockdown migration
+   fails there (`P3006 schema "auth" does not exist`) — even with `--create-only`. Instead:
+   edit `schema.prisma`; `mkdir prisma/migrations/<UTC yyyymmddHHMMSS>_<name>`; write the SQL with
+   `pnpm -s prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --script`
+   (diffs the real database, no shadow) into its `migration.sql`; append the lockdown block if a
+   table was added; `pnpm db:migrate:deploy`; `pnpm db:generate`.
 7. Feature folders: `lib/<feature>/{scoped,store,actions}.ts`; pure rules get `*.test.ts`.
 8. Server actions return `{ ok: true } | { ok: false; error }` and never throw. Keep each action's
    signature on one line (the guard test reads the line after it).

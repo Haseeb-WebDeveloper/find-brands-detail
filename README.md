@@ -29,5 +29,5 @@ Design: `docs/superpowers/specs/2026-10-16-brand-enrich-design.md`. Rules: `AGEN
 
 ## Commands
 
-`pnpm test` · `pnpm typecheck` · `pnpm lint` · `pnpm build` · `pnpm db:migrate` ·
+`pnpm test` · `pnpm typecheck` · `pnpm lint` · `pnpm build` · schema changes: AGENTS.md rule 6 ·
 `pnpm db:migrate:deploy` · `pnpm verify:lockdown` · `pnpm verify:realtime` · `pnpm bootstrap <email>` · `pnpm inngest:dev`
