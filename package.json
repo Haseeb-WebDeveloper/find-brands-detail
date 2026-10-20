@@ -19,6 +19,7 @@
     "verify:lockdown": "tsx scripts/verify-lockdown.ts",
     "verify:realtime": "tsx scripts/verify-realtime.ts",
     "test-set": "tsx --conditions=react-server scripts/test-set.ts",
+    "meta:token": "tsx scripts/meta-token.ts",
     "inngest:dev": "pnpm dlx inngest-cli@latest dev -u http://localhost:3005/api/inngest"
   },
   "dependencies": {
