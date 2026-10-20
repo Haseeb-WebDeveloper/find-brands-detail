@@ -1,0 +1,666 @@
+/* ==================================================================================================
+   OUR DESIGN LANGUAGE: the tokens and the glass material.     The rules: docs/DESIGN-LANGUAGE.md
+
+   Everything here takes effect inside `[data-design]` and nowhere else. The roofing website
+   template has its own tokens in its own package, and the two share nothing: a change here can
+   never move a contractor's site, and a change there can never move ours.
+
+   The utilities (`bg-surface`, `text-callout`, `rounded-card`...) are generated everywhere, because
+   Tailwind's theme is global, but their VALUES only exist under `[data-design]`. Outside it they
+   resolve to nothing, which is the point.
+   ================================================================================================ */
+
+@theme inline {
+  /* Neutrals. Two colours for words (`label`, `label-secondary`); everything else is chrome. */
+  --color-window: var(--ds-window);
+  --color-canvas: var(--ds-canvas);
+  --color-surface: var(--ds-surface);
+  --color-page: var(--ds-page);
+  --color-surface-raised: var(--ds-surface-raised);
+  --color-label: var(--ds-label);
+  --color-label-secondary: var(--ds-label-secondary);
+  /* FAILS CONTRAST ON PURPOSE. Icons that are decoration, never words. */
+  --color-label-tertiary: var(--ds-label-tertiary);
+  --color-separator: var(--ds-separator);
+  --color-fill: var(--ds-fill);
+  --color-fill-strong: var(--ds-fill-strong);
+  /* A switch's knob, and a symbol on a coloured tile: white in both themes, like iOS. */
+  --color-knob: var(--ds-knob);
+  --color-chip: var(--ds-chip);
+  /* Behind a dialog or a full sheet: the page is still there, but it is not the thing to look at. */
+  --color-scrim: var(--ds-scrim);
+  /* The grabber at the top of a phone sheet. */
+  --color-grabber: var(--ds-grabber);
+
+  /* The one accent. `tint` fills, `tint-text` is the accent as words, `tint-contrast` sits on a fill. */
+  --color-tint: var(--ds-tint);
+  --color-tint-text: var(--ds-tint-text);
+  --color-tint-contrast: var(--ds-tint-contrast);
+
+  /* Apple's system colours. Fills for icon tiles and status; a status is a TINT of one of these. */
+  --color-system-red: var(--ds-red);
+  --color-system-orange: var(--ds-orange);
+  --color-system-yellow: var(--ds-yellow);
+  --color-system-green: var(--ds-green);
+  --color-system-mint: var(--ds-mint);
+  --color-system-teal: var(--ds-teal);
+  --color-system-blue: var(--ds-blue);
+  --color-system-indigo: var(--ds-indigo);
+  --color-system-purple: var(--ds-purple);
+  --color-system-pink: var(--ds-pink);
+  --color-system-grey: var(--ds-grey);
+  /* The system reds are fills; as WORDS they fail contrast. This one passes 4.5:1 in both themes. */
+  --color-danger-text: var(--ds-danger-text);
+  /* A red FILL under white words (a Delete button): deeper than the system red, which carries white
+     at only 3.5:1. One value in both themes; white on it is 5.3:1. */
+  --color-danger-fill: var(--ds-danger-fill);
+
+  /* TYPE. Two scales behind one set of names: iPhone's on a phone, a step smaller on a desktop,
+     where the screen is read from further away but with a sharper eye and far more on it. The
+     values live in the base layer below and switch at 768px; a component only ever names the
+     style. Size, line, tracking and weight travel together; nothing sets them separately. */
+  --text-large-title: var(--ds-t-large-title);
+  --text-large-title--line-height: var(--ds-l-large-title);
+  --text-large-title--letter-spacing: -0.021em;
+  --text-large-title--font-weight: 700;
+  --text-title-1: var(--ds-t-title-1);
+  --text-title-1--line-height: var(--ds-l-title-1);
+  --text-title-1--letter-spacing: -0.02em;
+  --text-title-1--font-weight: 700;
+  --text-title-2: var(--ds-t-title-2);
+  --text-title-2--line-height: var(--ds-l-title-2);
+  --text-title-2--letter-spacing: -0.017em;
+  --text-title-2--font-weight: 600;
+  --text-title-3: var(--ds-t-title-3);
+  --text-title-3--line-height: var(--ds-l-title-3);
+  --text-title-3--letter-spacing: -0.014em;
+  --text-title-3--font-weight: 600;
+  --text-headline: var(--ds-t-headline);
+  --text-headline--line-height: var(--ds-l-headline);
+  --text-headline--letter-spacing: -0.011em;
+  --text-headline--font-weight: 600;
+  --text-body: var(--ds-t-body);
+  --text-body--line-height: var(--ds-l-body);
+  --text-body--letter-spacing: -0.011em;
+  --text-body--font-weight: 400;
+  --text-callout: var(--ds-t-callout);
+  --text-callout--line-height: var(--ds-l-callout);
+  --text-callout--letter-spacing: -0.008em;
+  --text-subhead: var(--ds-t-subhead);
+  --text-subhead--line-height: var(--ds-l-subhead);
+  --text-subhead--letter-spacing: -0.005em;
+  --text-footnote: var(--ds-t-footnote);
+  --text-footnote--line-height: var(--ds-l-footnote);
+  --text-footnote--letter-spacing: -0.002em;
+  /* The floor. Nothing smaller exists. */
+  --text-caption: var(--ds-t-caption);
+  --text-caption--line-height: var(--ds-l-caption);
+  --text-caption--letter-spacing: 0.004em;
+  --text-caption--font-weight: 500;
+}
+
+@theme {
+  /* Corners. Buttons, chips and segmented controls are capsules (`rounded-full`); a text field is a
+     rounded rectangle, because a capsule as wide as a form reads as a pill, not a field. Containers
+     are soft but not bubbly (owner, 2026-10-13: "we don't have to use big rounded everywhere"), and
+     they nest: inner = outer minus the gap. */
+  --radius-tile: 6px;
+  --radius-field: 8px;
+  --radius-inner: 8px;
+  --radius-card: 12px;
+  --radius-panel: 14px;
+  --radius-sheet: 28px;
+}
+
+/* IN LAYERS, and that is load-bearing. Unlayered CSS beats every Tailwind utility, so a glass rule
+   saying `position: relative` silently overrode `absolute` on a floating marker and pushed it into
+   the flow. In `base` and `components`, a utility on the element always wins. */
+@layer base {
+  /* ----------------------------------------------------------------------------------- light --- */
+  [data-design] {
+    /* The WINDOW, behind everything, under the colour wash. The page floats on it as a panel. */
+    --ds-window: #e9e9ee;
+    --ds-canvas: #f4f4f7;
+    --ds-surface: #ffffff;
+    /* A rebuilt page's own ground: a soft grey that white cards lift off (owner, 2026-10-14: the
+       page read flat and dull with everything on one layer). Tables still sit straight on it. */
+    --ds-page: #f4f4f7;
+    --ds-surface-raised: #f7f7f9;
+    --ds-label: #1d1d1f;
+    --ds-label-secondary: #6e6e73;
+    --ds-label-tertiary: #aeaeb2;
+    --ds-separator: #e5e5ea;
+    /* Alpha, not a grey: a field has to read the same on the canvas and on a white card. */
+    --ds-fill: rgb(120 120 128 / 0.12);
+    --ds-fill-strong: rgb(120 120 128 / 0.2);
+    --ds-knob: #ffffff;
+    --ds-knob-shadow: 0 3px 8px rgb(0 0 0 / 0.15), 0 1px 1px rgb(0 0 0 / 0.16);
+    /* A filled button's lit top edge and contact shadow. */
+    --ds-button-rim: inset 0 1px 0 rgb(255 255 255 / 0.22), 0 1px 1px rgb(0 0 0 / 0.06);
+    /* A segmented control's chosen option: a solid chip lifted off the track. */
+    --ds-chip: #ffffff;
+    --ds-scrim: rgb(0 0 0 / 0.22);
+    --ds-grabber: rgb(60 60 67 / 0.3);
+    --ds-chip-lift: 0 1px 2px rgb(0 0 0 / 0.06);
+
+    /* Blue, for admin and our website. The office overrides these three with the contractor's brand. */
+    --ds-tint: #0071e3;
+    --ds-tint-text: #0066cc;
+    --ds-tint-contrast: #ffffff;
+
+    --ds-red: #ff3b30;
+    --ds-orange: #ff9500;
+    --ds-yellow: #ffcc00;
+    --ds-green: #34c759;
+    --ds-mint: #00c7be;
+    --ds-teal: #30b0c7;
+    --ds-blue: #007aff;
+    --ds-indigo: #5856d6;
+    --ds-purple: #af52de;
+    --ds-pink: #ff2d55;
+    --ds-grey: #8e8e93;
+    --ds-danger-text: #d70015;
+    --ds-danger-fill: #d70015;
+
+    /* SOFT (owner, 2026-10-13: "reduce shadow from things"). A shadow here only says "this floats";
+       depth comes from the glass's rim and from surface against canvas, not from darkness below. */
+    --ds-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.04), 0 2px 6px rgb(0 0 0 / 0.04);
+    --ds-shadow-md: 0 1px 2px rgb(0 0 0 / 0.04), 0 4px 14px rgb(0 0 0 / 0.06);
+    --ds-shadow-lg: 0 2px 4px rgb(0 0 0 / 0.04), 0 8px 28px rgb(0 0 0 / 0.08);
+
+    /* Type, the phone scale: iPhone's own sizes. */
+    --ds-t-large-title: 2.125rem;
+    --ds-l-large-title: 2.5rem;
+    --ds-t-title-1: 1.75rem;
+    --ds-l-title-1: 2.125rem;
+    --ds-t-title-2: 1.375rem;
+    --ds-l-title-2: 1.75rem;
+    --ds-t-title-3: 1.25rem;
+    --ds-l-title-3: 1.5rem;
+    --ds-t-headline: 1.0625rem;
+    --ds-l-headline: 1.375rem;
+    --ds-t-body: 1.0625rem;
+    --ds-l-body: 1.375rem;
+    --ds-t-callout: 1rem;
+    --ds-l-callout: 1.3125rem;
+    --ds-t-subhead: 0.9375rem;
+    --ds-l-subhead: 1.25rem;
+    --ds-t-footnote: 0.8125rem;
+    --ds-l-footnote: 1.125rem;
+    --ds-t-caption: 0.75rem;
+    --ds-l-caption: 1rem;
+
+    /* Control heights. These follow the POINTER, not the screen: a finger needs 44px wherever it
+       is, a mouse does not, and a laptop with a touchscreen gets the finger's sizes. */
+    --ds-control-sm: 1.75rem;
+    --ds-control-md: 2rem;
+    --ds-control-lg: 2.5rem;
+    --ds-row: 2.5rem;
+
+    color-scheme: light;
+    background-color: var(--ds-canvas);
+    color: var(--ds-label);
+    font-family: var(--font-design), ui-sans-serif, system-ui, sans-serif;
+    font-optical-sizing: auto;
+    font-size: var(--ds-t-body);
+    line-height: var(--ds-l-body);
+    letter-spacing: -0.011em;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Type, the desktop scale: body 14px with titles kept modest. Stepped down three times on the
+     owner's eye (2026-10-13: "sizes feel big", each time), landing where sell2skale's app sits. */
+  @media (min-width: 768px) {
+    [data-design] {
+      --ds-t-large-title: 1.375rem;
+      --ds-l-large-title: 1.75rem;
+      --ds-t-title-1: 1.25rem;
+      --ds-l-title-1: 1.625rem;
+      --ds-t-title-2: 1.0625rem;
+      --ds-l-title-2: 1.375rem;
+      --ds-t-title-3: 0.9375rem;
+      --ds-l-title-3: 1.25rem;
+      --ds-t-headline: 0.875rem;
+      --ds-l-headline: 1.25rem;
+      --ds-t-body: 0.875rem;
+      --ds-l-body: 1.25rem;
+      --ds-t-callout: 0.8125rem;
+      --ds-l-callout: 1.125rem;
+      --ds-t-subhead: 0.75rem;
+      --ds-l-subhead: 1rem;
+      --ds-t-footnote: 0.6875rem;
+      --ds-l-footnote: 0.875rem;
+      --ds-t-caption: 0.6875rem;
+      --ds-l-caption: 0.875rem;
+    }
+  }
+
+  /* A finger: iPhone's own sizes (owner, 2026-10-13: 44px buttons "feel extra large"). A search field
+     and a segmented control are 36 on iPhone, a nav bar button smaller still; the 44px a thumb needs
+     is the button's invisible tap area (button.tsx), not its drawn size. */
+  @media (pointer: coarse) {
+    [data-design] {
+      --ds-control-sm: 2rem;
+      --ds-control-md: 2.25rem;
+      --ds-control-lg: 2.75rem;
+      --ds-row: 2.75rem;
+    }
+  }
+
+  /* ------------------------------------------------------------------------------------ dark ---
+     A second palette, not the first inverted. True black canvas like iOS; surfaces lift in grey.
+     `data-mode` wins when present (the test page, a preview); otherwise the dashboard's `.dark`. */
+  [data-design][data-mode="dark"],
+  :where(.dark) [data-design]:not([data-mode="light"]) {
+    --ds-window: #000000;
+    --ds-canvas: #0e0e10;
+    --ds-surface: #1c1c1e;
+    /* DARKER, SO THE CARDS LIFT (owner, 2026-10-14). The lifted grey of 2026-10-13 put the page, the
+       details and every list on one layer and the screen read dull. Near-black, a touch of the
+       company's colour, about the shade of the glass sidebar over the window so the two still read as
+       one; cards are `--ds-surface` above it, menus and sheets `--ds-surface-raised` above those. */
+    --ds-page: color-mix(in oklab, var(--ds-tint) 3%, #111114);
+    --ds-surface-raised: #2c2c2e;
+    --ds-label: #f5f5f7;
+    --ds-label-secondary: #a1a1a6;
+    --ds-label-tertiary: #636366;
+    --ds-separator: #38383a;
+    --ds-fill: rgb(118 118 128 / 0.24);
+    --ds-fill-strong: rgb(118 118 128 / 0.36);
+
+    --ds-tint: #0071e3;
+    --ds-tint-text: #2997ff;
+    --ds-tint-contrast: #ffffff;
+
+    --ds-red: #ff453a;
+    --ds-orange: #ff9f0a;
+    --ds-yellow: #ffd60a;
+    --ds-green: #30d158;
+    --ds-mint: #63e6e2;
+    --ds-teal: #40c8e0;
+    --ds-blue: #0a84ff;
+    --ds-indigo: #5e5ce6;
+    --ds-purple: #bf5af2;
+    --ds-pink: #ff375f;
+    --ds-grey: #8e8e93;
+    --ds-danger-text: #ff6961;
+    --ds-danger-fill: #d70015;
+
+    --ds-button-rim: inset 0 1px 0 rgb(255 255 255 / 0.16), 0 1px 1px rgb(0 0 0 / 0.25);
+    --ds-chip: #636366;
+    --ds-scrim: rgb(0 0 0 / 0.55);
+    --ds-grabber: rgb(235 235 245 / 0.3);
+    --ds-chip-lift: 0 1px 2px rgb(0 0 0 / 0.4);
+    --ds-shadow-sm: 0 1px 2px rgb(0 0 0 / 0.25), 0 2px 6px rgb(0 0 0 / 0.2);
+    --ds-shadow-md: 0 1px 2px rgb(0 0 0 / 0.25), 0 4px 14px rgb(0 0 0 / 0.28);
+    --ds-shadow-lg: 0 2px 4px rgb(0 0 0 / 0.25), 0 8px 28px rgb(0 0 0 / 0.36);
+
+    color-scheme: dark;
+  }
+
+  /* The template's base layer sets h1-h4 in its display serif. Not here: a title is a size and a
+     weight, set by the type utilities. */
+  /* Not inside `.legacy-surface`: a page still on the old surface keeps its own heading styles. */
+  [data-design] :where(h1, h2, h3, h4, h5, h6):not(.legacy-surface *) {
+    font-family: inherit;
+    letter-spacing: inherit;
+    font-weight: inherit;
+  }
+
+  /* Keyboard focus: one thin ring, following the shape. A field shows focus with its own border
+     instead (text-field.tsx), so it opts out. */
+  [data-design] :focus-visible {
+    outline: 2px solid var(--ds-tint);
+    outline-offset: 2px;
+  }
+}
+
+/* ----------------------------------------------------------------------------------- the glass ---
+   `data-glass="thin | regular | thick"` on any element. Optional:
+     data-glass-kind="tinted | clear"   the main action in the accent; or glass over a photo
+     data-glass-tone="light | dark"     force a tone where the glass sits over the other one
+
+   What makes it glass rather than a tinted blur, each in its own place:
+     the fill        THIN. Half white. The clarity comes from a heavy blur, not from the tint.
+     the blur        heavy (24px on a bar) with the colours behind it lifted, so it stays alive.
+     the glow        an inner light toward the rim, on the box-shadow: real glass brightens at its
+                     edge because the thick rim bends more light into view. This is the single
+                     biggest difference between glass and frosted plastic.
+     the sheen       light from above, as a background gradient over the fill.
+     the edge        ::after, a 1px ring hottest at two opposite corners and almost gone between.
+                     In light, the faint part is a DARK hairline: a white edge on a white page is
+                     invisible, and a light object on a light ground is separated by its shadow line.
+     NO HOVER. Glass does not light up under a mouse; it answers a press (button.tsx).
+     the lens        OPT-IN, Chrome only: the rim bends what is behind it (lens.ts). `data-lens` is set by
+                     use-glass.ts only where the browser can do it, so no other browser ever
+                     receives the property value it would reject.
+   Text on glass is always one of the two label colours; each tone redefines them, so `text-label`
+   inside dark glass on a light page is light. */
+@layer components {
+  /* The two tones. Light is the default; dark in dark mode, or wherever asked for. */
+  [data-glass] {
+    --ds-glass-base: oklch(1 0 0);
+    --ds-glass-alpha-thin: 0.55;
+    --ds-glass-alpha-regular: 0.5;
+    --ds-glass-alpha-thick: 0.78;
+    --ds-glass-glow:
+      inset 0 1px 1px oklch(1 0 0 / 90%),
+      inset 0 -1px 1px oklch(1 0 0 / 40%),
+      inset 0 0 18px oklch(1 0 0 / 35%);
+    --ds-glass-spec-hi: oklch(1 0 0 / 95%);
+    --ds-glass-spec-lo: oklch(0 0 0 / 8%);
+    --ds-glass-sheen: oklch(1 0 0 / 45%);
+    --ds-glass-shine: oklch(1 0 0 / 55%);
+  }
+  :is([data-design][data-mode="dark"], :where(.dark) [data-design]:not([data-mode="light"]))
+    [data-glass]:not([data-glass-tone="light"], [data-glass-kind="tinted"]),
+  [data-glass][data-glass-tone="dark"]:not([data-glass-kind="tinted"]) {
+    --ds-glass-base: oklch(0.2 0 0);
+    --ds-glass-alpha-thin: 0.6;
+    --ds-glass-alpha-regular: 0.6;
+    --ds-glass-alpha-thick: 0.82;
+    --ds-glass-glow:
+      inset 0 1px 1px oklch(1 0 0 / 22%),
+      inset 0 0 18px oklch(1 0 0 / 6%);
+    --ds-glass-spec-hi: oklch(1 0 0 / 45%);
+    --ds-glass-spec-lo: oklch(1 0 0 / 8%);
+    --ds-glass-sheen: oklch(1 0 0 / 10%);
+    --ds-glass-shine: oklch(1 0 0 / 14%);
+    --ds-label: #f5f5f7;
+    --ds-label-secondary: #a1a1a6;
+    color-scheme: dark;
+  }
+  [data-glass][data-glass-tone="light"] {
+    --ds-label: #1d1d1f;
+    --ds-label-secondary: #6e6e73;
+    color-scheme: light;
+  }
+
+  [data-glass] {
+    --g-alpha: var(--ds-glass-alpha-regular);
+    --g-blur: 24px;
+    --g-shadow: var(--ds-shadow-md);
+    position: relative;
+    isolation: isolate;
+    color: var(--ds-label);
+    background-color: color-mix(
+      in oklab,
+      var(--ds-glass-base) calc(var(--g-alpha) * 100%),
+      transparent
+    );
+    background-image: linear-gradient(to bottom, var(--ds-glass-sheen), transparent 60%);
+    backdrop-filter: blur(var(--g-blur)) saturate(190%);
+    box-shadow: var(--ds-glass-glow), var(--g-shadow);
+  }
+  [data-glass][data-lens] {
+    backdrop-filter: var(--g-lens) blur(var(--g-blur)) saturate(190%);
+  }
+  [data-glass="thin"] {
+    --g-alpha: var(--ds-glass-alpha-thin);
+    --g-blur: 12px;
+    --g-shadow: var(--ds-shadow-sm);
+  }
+  [data-glass="thick"] {
+    --g-alpha: var(--ds-glass-alpha-thick);
+    --g-blur: 30px;
+    --g-shadow: var(--ds-shadow-lg);
+  }
+  /* Over a photo, where the picture should come through. */
+  [data-glass-kind="clear"] {
+    --g-alpha: 0.18;
+    --g-blur: 6px;
+  }
+  /* The main action: Apple's prominent glass, the accent as glass. The base is DEEPER than the
+     accent because translucency lightens a colour toward what is behind it; at 80% over white it
+     lands about on the accent itself and keeps white text above 4.5:1. Its shadow carries the
+     colour, the way coloured glass throws coloured light. */
+  [data-glass][data-glass-kind="tinted"] {
+    --ds-glass-base: color-mix(in oklab, var(--ds-tint) 82%, black);
+    --g-alpha: 0.82;
+    --ds-glass-glow:
+      inset 0 1px 1px oklch(1 0 0 / 55%),
+      inset 0 -1px 1px oklch(1 0 0 / 18%),
+      inset 0 0 14px oklch(1 0 0 / 20%);
+    --ds-glass-spec-hi: oklch(1 0 0 / 70%);
+    --ds-glass-spec-lo: oklch(1 0 0 / 10%);
+    --ds-glass-sheen: oklch(1 0 0 / 22%);
+    --g-shadow:
+      0 2px 8px color-mix(in oklab, var(--ds-tint) 18%, transparent),
+      0 1px 2px oklch(0 0 0 / 8%);
+    color: var(--ds-tint-contrast);
+  }
+
+  [data-glass]::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+  }
+  [data-glass]::after {
+    padding: 1px;
+    background: linear-gradient(
+      135deg,
+      var(--ds-glass-spec-hi) 0%,
+      var(--ds-glass-spec-lo) 30%,
+      var(--ds-glass-spec-lo) 70%,
+      var(--ds-glass-spec-hi) 100%
+    );
+    /* LONGHANDS, not the `mask` shorthand: the CSS compiler rewrites the shorthand and drops
+       `exclude`, and the gradient then paints over the whole surface. */
+    mask-image: linear-gradient(#000 0 0), linear-gradient(#000 0 0);
+    mask-clip: content-box, border-box;
+    mask-composite: exclude;
+  }
+
+  /* Somebody asked for less see-through, or more contrast: solid surfaces with a real edge. A
+     designed version, not glass with the effects missing. */
+  @media (prefers-reduced-transparency: reduce) {
+    [data-design] [data-glass] {
+      --g-alpha: 1;
+      --g-blur: 0px;
+      background-image: none;
+    }
+  }
+  @media (prefers-contrast: more) {
+    [data-design] [data-glass] {
+      --g-alpha: 1;
+      --g-blur: 0px;
+      background-image: none;
+      box-shadow:
+        inset 0 0 0 1px var(--ds-label),
+        var(--g-shadow);
+    }
+    [data-design] [data-glass]::after {
+      display: none;
+    }
+  }
+}
+
+/* Continuous corners where the browser has them (Apple's corners are a smooth curve, not a quarter
+   circle). Elsewhere it is ordinary rounding and still right. */
+@supports (corner-shape: squircle) {
+  [data-design] [data-continuous] {
+    corner-shape: squircle;
+  }
+}
+
+/* ------------------------------------------------------------------------------ scroll edge ---
+   Where content passes under a floating bar, it dissolves into it instead of being cut by a line:
+   a blur that fades out downward, on a layer behind the bar. Its opacity is driven by how far the
+   page has scrolled (page-header.tsx), so at rest there is nothing there at all. */
+@layer components {
+  [data-design] .scroll-edge {
+    background-color: color-mix(in oklab, var(--ds-ground, var(--ds-canvas)) 72%, transparent);
+    backdrop-filter: blur(12px) saturate(180%);
+    mask-image: linear-gradient(to bottom, #000 55%, transparent);
+  }
+  @media (prefers-reduced-transparency: reduce) {
+    [data-design] .scroll-edge {
+      background-color: var(--ds-ground, var(--ds-canvas));
+      backdrop-filter: none;
+    }
+  }
+}
+
+/* --------------------------------------------------------------------------------------- mesh ---
+   GLASS NEEDS COLOUR BEHIND IT, AND THE COLOUR BELONGS TO THE WINDOW, BEHIND EVERYTHING (owner,
+   2026-10-13, twice). One light source: a soft wash across the top of the window, gone by two thirds of
+   the way down with no edge anywhere. The sidebar is clear over it; the page is a panel floating over
+   it. So the colour shows around the page and through the sidebar, never behind the words.
+   Taken from sell2skale's `window-mesh`, in our lighter hues. */
+@layer base {
+  [data-design] {
+    --ds-mesh:
+      radial-gradient(60% 55% at 4% -15%, oklch(0.84 0.09 255 / 0.75), transparent 66%),
+      radial-gradient(50% 45% at 40% -20%, oklch(0.88 0.07 230 / 0.6), transparent 68%),
+      radial-gradient(55% 50% at 78% -15%, oklch(0.9 0.06 200 / 0.6), transparent 66%),
+      radial-gradient(45% 42% at 100% -5%, oklch(0.88 0.07 285 / 0.5), transparent 70%);
+  }
+  [data-design][data-mode="dark"],
+  :where(.dark) [data-design]:not([data-mode="light"]) {
+    --ds-mesh:
+      radial-gradient(60% 55% at 4% -15%, oklch(0.42 0.13 260 / 0.75), transparent 66%),
+      radial-gradient(50% 45% at 40% -20%, oklch(0.38 0.1 235 / 0.6), transparent 68%),
+      radial-gradient(55% 50% at 78% -15%, oklch(0.38 0.08 205 / 0.55), transparent 66%),
+      radial-gradient(45% 42% at 100% -5%, oklch(0.36 0.1 285 / 0.5), transparent 70%);
+  }
+}
+@utility window-mesh {
+  background-image: var(--ds-mesh);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 26%, transparent 72%);
+}
+
+/* ------------------------------------------------------------------------------------- panel ---
+   WHAT A POPUP IS MADE OF: menus, popovers (the calendar among them), dialogs and toasts. Not glass
+   (owner, 2026-10-13: glass on every small popup was too much, then: plain colour). Solid, a hairline
+   edge and the soft floating shadow. What Mac, Windows,
+   Linear and Notion menus are made of, and the words on it stay crisp over a busy table.
+   Glass is kept for the few things that float over the page while you work: the sidebar and the bar of
+   bulk actions. */
+@layer components {
+  [data-design] {
+    --ds-panel: var(--ds-surface);
+    --ds-panel-edge: rgb(0 0 0 / 0.1);
+  }
+  [data-design][data-mode="dark"],
+  :where(.dark) [data-design]:not([data-mode="light"]) {
+    --ds-panel: var(--ds-surface-raised);
+    --ds-panel-edge: rgb(255 255 255 / 0.1);
+  }
+  /* A PLAIN COLOUR, no blur (owner, 2026-10-13): solid white, or the raised grey in dark. */
+  [data-panel] {
+    color: var(--ds-label);
+    background-color: var(--ds-panel);
+    box-shadow: 0 0 0 0.5px var(--ds-panel-edge), var(--ds-shadow-lg);
+  }
+  @media (prefers-reduced-transparency: reduce) {
+    [data-design] [data-panel] {
+      background-color: var(--ds-surface);
+      backdrop-filter: none;
+    }
+  }
+}
+
+/* --------------------------------------------------------------------------------------- pill ---
+   THE CHOSEN ROW IS A PIECE OF GLASS: where you are in the sidebar, the row under the pointer or the
+   keyboard in a menu, the selected tab. A clear capsule resting on the colour behind it: translucent
+   white, brighter toward its right end where the light falls, a bright rim on top, a light hairline
+   round it, and a whisper of shadow under it. The owner's reference, a Liquid Glass menu, does
+   exactly this; the first version here was a grey fill and was rightly called wrong. */
+@layer components {
+  [data-design] {
+    --ds-pill-from: rgb(255 255 255 / 0.5);
+    --ds-pill-to: rgb(255 255 255 / 0.85);
+    --ds-pill-rim:
+      inset 0 1px 0 rgb(255 255 255 / 0.95), inset 0 0 0 0.5px rgb(255 255 255 / 0.7),
+      0 1px 3px rgb(0 0 0 / 0.06), 0 0 0 0.5px rgb(0 0 0 / 0.04);
+  }
+  [data-design][data-mode="dark"],
+  :where(.dark) [data-design]:not([data-mode="light"]) {
+    --ds-pill-from: rgb(255 255 255 / 0.08);
+    --ds-pill-to: rgb(255 255 255 / 0.18);
+    --ds-pill-rim:
+      inset 0 1px 0 rgb(255 255 255 / 0.22), inset 0 0 0 0.5px rgb(255 255 255 / 0.12),
+      0 1px 3px rgb(0 0 0 / 0.3);
+  }
+  /* ON LIGHT GLASS A WHITE CAPSULE IS INVISIBLE (owner's screen, 2026-10-13: the chosen stage in a
+     white menu could not be seen). Light menus and popovers are near white, so there the capsule is
+     a soft grey of the same shape, still with its bright top edge. Dark glass keeps the clear one. */
+  [data-design]:not([data-mode="dark"]) :is([data-glass], [data-panel]) {
+    --ds-pill-from: rgb(0 0 0 / 0.06);
+    --ds-pill-to: rgb(0 0 0 / 0.04);
+    --ds-pill-rim: inset 0 1px 0 rgb(255 255 255 / 0.7), inset 0 0 0 0.5px rgb(0 0 0 / 0.05);
+  }
+  :where(.dark) [data-design]:not([data-mode="light"]) :is([data-glass], [data-panel]) {
+    --ds-pill-from: rgb(255 255 255 / 0.08);
+    --ds-pill-to: rgb(255 255 255 / 0.18);
+    --ds-pill-rim:
+      inset 0 1px 0 rgb(255 255 255 / 0.22), inset 0 0 0 0.5px rgb(255 255 255 / 0.12),
+      0 1px 3px rgb(0 0 0 / 0.3);
+  }
+}
+
+/* A utility, not a plain class, so it takes variants: `data-highlighted:pill` in a menu. */
+@utility pill {
+  background-image: linear-gradient(90deg, var(--ds-pill-from), var(--ds-pill-to));
+  box-shadow: var(--ds-pill-rim);
+  backdrop-filter: blur(12px) saturate(180%);
+}
+
+/* ------------------------------------------------------------------------------ sidebar glass ---
+   The sidebar is frosted glass attached to the window's edge (owner's reference, 2026-10-13: a glass
+   navigation panel). See-through to the window's colour wash, blurred, with a faint sheen falling from
+   its top corner. It is the one large piece of glass in the frame, and it is attached, not floating. */
+@layer components {
+  [data-design] {
+    --ds-sidebar-fill: color-mix(in oklab, var(--ds-window) 55%, transparent);
+    --ds-sidebar-sheen: rgb(255 255 255 / 0.45);
+  }
+  [data-design][data-mode="dark"],
+  :where(.dark) [data-design]:not([data-mode="light"]) {
+    --ds-sidebar-fill: rgb(28 28 32 / 0.55);
+    --ds-sidebar-sheen: rgb(255 255 255 / 0.06);
+  }
+}
+@utility sidebar-glass {
+  background-color: var(--ds-sidebar-fill);
+  background-image: linear-gradient(160deg, var(--ds-sidebar-sheen), transparent 45%);
+  backdrop-filter: blur(24px) saturate(180%);
+}
+
+/* A scrolling column that fades out at its foot, so a list cut short says "there is more" instead
+   of ending on half a row. Over empty space the fade has nothing to touch. */
+@utility fade-bottom {
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 20px), transparent);
+}
+
+/* Scrollbars: thin, a quiet thumb on no track, in both themes.
+   OUTSIDE ANY LAYER, ON PURPOSE. The template sets `* { scrollbar-color: var(--border) transparent }`
+   with no layer, for the contractor's site, and unlayered CSS beats every layer: inside a layer this
+   rule lost, and dark mode drew the template's light grey thumb (owner, 2026-10-13). Unlayered and
+   one attribute more specific, ours wins inside `[data-design]` and nowhere else. */
+[data-design] {
+  --ds-scrollbar: rgb(0 0 0 / 0.18);
+}
+[data-design][data-mode="dark"],
+:where(.dark) [data-design]:not([data-mode="light"]) {
+  --ds-scrollbar: rgb(255 255 255 / 0.2);
+}
+[data-design],
+[data-design] * {
+  scrollbar-width: thin;
+  scrollbar-color: var(--ds-scrollbar) transparent;
+}
+
+/* ----------------------------------------------------------------------------- page ground ---
+   What a rebuilt page (DesignPage) stands on, as one variable its sticky rows and scroll edge paint
+   with. The page colour at every size: a phone's list runs edge to edge like the desktop's rows, so
+   there are no white groups needing a grey canvas round them. */
+@layer base {
+  [data-design] [data-page="full-bleed"] {
+    --ds-ground: var(--ds-page);
+  }
+}

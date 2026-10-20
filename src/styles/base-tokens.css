@@ -1,0 +1,365 @@
+/*
+ * The design tokens the template is drawn in: the warm paper palette and its dark twin, the brand
+ * and highlight colours, the font, radius and type-scale mappings Tailwind turns into utilities,
+ * the custom variants the shared primitives use (`dark:`, `app:`, `hover-hover:`), and the base
+ * layer (borders, body colours, heading face, pointer cursors).
+ *
+ * The template and the shared UI primitives name these tokens everywhere, so they live here, beside
+ * the components, and every app that renders the template gets the one copy. An app layers its own
+ * surfaces on top (contractor-sites adds the dashboard's `[data-surface="app"]` values and the
+ * landing page's console in `src/app/globals.css`).
+ *
+ * The font variables (`--font-inter`, `--font-sebenta`, `--font-plex-mono`) come from
+ * `lib/fonts.ts`, attached to `<html>` by the app.
+ */
+
+@custom-variant dark (&:is(.dark *));
+
+/* `app:h-8`, `app:text-app-md`, and so on: "this value, but only on the signed-in surface".
+   Six primitives (`Input`, `Select`, `Dialog`, `Textarea`, `Avatar`, `Sheet`) are shared with the
+   marketing template and genuinely want different measurements on each. A 32px input with a 13px
+   face is right in a dense tool and wrong on a page selling roofs.
+
+   THIS REPLACES A SCOPED `@layer components` BLOCK THAT NEVER APPLIED, and the failure is worth
+   recording because it looks like it should work. The idea was to write `[data-surface="app"]
+   [data-slot="input"] { height: 32px }` in the components layer so a call site's utility could still
+   override it. It can, and so can the component's own base classes, which are also utilities: `h-7`
+   in `input.tsx` beat the rule every single time. Layers cannot separate "the component's default"
+   from "the call site's override" because both are the same kind of thing.
+
+   A variant can, because it lands in the class string next to the default it is replacing, and later
+   utilities of equal specificity win. It is also visible in the component, which the scoped block
+   was not. */
+@custom-variant app (&:is([data-surface="app"] *));
+
+/* `hover-hover:opacity-0` — "only where a pointer can actually hover".
+   Every widget header hides its actions until the card is hovered, which on a touch screen means a
+   button that does not exist: there is no hover, so it never reveals. Guarding on the DEVICE rather
+   than on the viewport is the more accurate question, and the difference is real — a narrow window
+   on a laptop still has a mouse, and a wide tablet still does not. */
+@custom-variant hover-hover (@media (hover: hover));
+
+/* ── Base palette ───────────────────────────────────────────────────────────
+   Warm PAPER, not stark white and not the cliché cafe-cream: a light stone that
+   reads like a trade document / blueprint sheet. Cards are near-white so content
+   panels lift off the paper with a hairline border rather than a drop shadow. */
+:root {
+  --background: oklch(0.984 0.004 85);
+  --foreground: oklch(0.23 0.014 62);
+  --card: oklch(0.997 0.002 85);
+  --card-foreground: oklch(0.23 0.014 62);
+  --popover: oklch(0.997 0.002 85);
+  --popover-foreground: oklch(0.23 0.014 62);
+  --primary: oklch(0.48 0.19 258);
+  --primary-foreground: oklch(0.985 0.01 258);
+  --secondary: oklch(0.955 0.008 85);
+  --secondary-foreground: oklch(0.28 0.014 62);
+  --muted: oklch(0.955 0.008 85);
+  --muted-foreground: oklch(0.505 0.018 66);
+  --accent: oklch(0.95 0.01 85);
+  --accent-foreground: oklch(0.28 0.014 62);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.905 0.008 78);
+  --input: oklch(0.9 0.008 78);
+  --ring: oklch(0.55 0.16 258);
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+  --radius: 0.75rem;
+  --sidebar: oklch(0.984 0.004 85);
+  --sidebar-foreground: oklch(0.23 0.014 62);
+  --sidebar-primary: oklch(0.48 0.19 258);
+  --sidebar-primary-foreground: oklch(0.985 0.01 258);
+  --sidebar-accent: oklch(0.95 0.01 85);
+  --sidebar-accent-foreground: oklch(0.28 0.014 62);
+  --sidebar-border: oklch(0.905 0.008 78);
+  --sidebar-ring: oklch(0.55 0.16 258);
+
+  /* Default brand = slate, so --brand never resolves empty outside a theme. */
+  --brand: oklch(0.48 0.19 258);
+  --brand-strong: oklch(0.4 0.17 258);
+  --brand-foreground: oklch(0.985 0.01 258);
+  --brand-tint: oklch(0.95 0.032 255);
+  --brand-bright: oklch(0.72 0.18 258);
+
+  /* Warm amber highlighter — a single accent used across all themes for the
+     marker on statement copy (a designed, memorable pop). */
+  --highlight: oklch(87.3% 0.17854 92.233);
+
+  /* Overlay defaults for the MARKETING surface, and the reason they are declared here rather than
+     only on the app surface. `Popover`, `Select` and the rest are shared components, so they name
+     these variables unconditionally; a variable that exists on one surface and not the other
+     resolves to nothing on the other, and `background: ` with nothing after it is a transparent
+     menu. Plain and opaque here, frosted on the app surface. */
+  --app-overlay-bg: var(--popover);
+  --app-overlay-blur: none;
+}
+
+.dark {
+  --background: oklch(0.18 0.008 60);
+  --foreground: oklch(0.985 0.003 85);
+  --card: oklch(0.23 0.01 60);
+  --card-foreground: oklch(0.985 0.003 85);
+  --popover: oklch(0.23 0.01 60);
+  --popover-foreground: oklch(0.985 0.003 85);
+  --primary: oklch(0.55 0.07 245);
+  --primary-foreground: oklch(0.985 0.005 245);
+  --secondary: oklch(0.28 0.008 60);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.28 0.008 60);
+  --muted-foreground: oklch(0.72 0.012 66);
+  --accent: oklch(0.3 0.01 60);
+  --accent-foreground: oklch(0.985 0.003 85);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.55 0.07 245);
+  --sidebar: oklch(0.23 0.01 60);
+  --sidebar-foreground: oklch(0.985 0.003 85);
+  --sidebar-primary: oklch(0.55 0.07 245);
+  --sidebar-primary-foreground: oklch(0.985 0.01 258);
+  --sidebar-accent: oklch(0.3 0.01 60);
+  --sidebar-accent-foreground: oklch(0.985 0.003 85);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.55 0.07 245);
+}
+
+/* Map CSS-variable tokens to Tailwind v4 utilities (bg-background, border-border,
+   text-muted-foreground, font-heading, font-mono, etc.). The shadcn tailwind.css
+   import ships only animations/utilities, not these tokens. Fonts point at the
+   next/font variables set on <html>. */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --color-brand: var(--brand);
+  --color-brand-strong: var(--brand-strong);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-brand-tint: var(--brand-tint);
+  --color-highlight: var(--highlight);
+
+  /* The wash under every row, nav item and menu entry on the app surface (see
+     `[data-surface="app"]`). Declared here so `hover:bg-app-hover` is an ordinary utility, and with
+     a fallback so it resolves to *something* on the marketing surface rather than to nothing —
+     which is what an unset custom property does. */
+  --color-app-hover: var(--app-hover, var(--muted));
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 6px);
+  /* Larger steps used by the refreshed shadcn preset components. */
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  /* Headings use Sebenta (local display face). Falls back to Inter, then
+     the serif stack Sebenta belongs to, so a failed font load degrades sensibly. */
+  --font-heading: var(--font-sebenta), var(--font-inter), ui-serif, Georgia, serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
+
+  /* ── The app type scale, as real utilities ─────────────────────────────────
+     `text-app-md`, `text-app-sm` and so on. Registered in the theme rather than declared on
+     `[data-surface="app"]` because the primitives that use them are SHARED with the marketing site:
+     a variable scoped to one surface computes to nothing on the other, and a font-size that resolves
+     to nothing is a silent 16px.
+
+     The pixel values are the reference's, restated against our 16px root. It writes its scale against
+     a 13px root, so its `0.92rem` is 12px and not 14.7px. `docs/DESIGN-SYSTEM.md` has the workings
+     and the reason this is the easiest single thing to copy wrongly.
+
+     `md` at 13px is the workhorse: body, buttons, table cells. `sm` at 12px is menu items and meta.
+     Nothing in the working surface is larger than `lg`.
+
+     EACH SIZE CARRIES ITS OWN LINE HEIGHT, and leaving that out was a real bug rather than an
+     omission. A `--text-*` entry with no paired line height emits font-size alone, so the value
+     inherits from whatever the parent happened to set. A 13px chip inside a card running `relaxed`
+     got a 21px line box inside a 20px chip, which `overflow-hidden` then clipped: the chips looked
+     both too big and slightly wrong and neither was the font size's fault.
+
+     1.1 is the reference's dense line height and the right default for chrome. Anything setting real
+     prose asks for it: `text-app-md/relaxed`. */
+  --text-app-xxs: 0.5rem; /* 8px  */
+  --text-app-xxs--line-height: 1.1;
+  --text-app-xs: 0.6875rem; /* 11px */
+  --text-app-xs--line-height: 1.1;
+  --text-app-sm: 0.75rem; /* 12px */
+  --text-app-sm--line-height: 1.4;
+  --text-app-md: 0.8125rem; /* 13px */
+  --text-app-md--line-height: 1.6;
+  /* 14px at a line height somebody can actually read a sentence in, and it is a NINTH step so it
+     needs a reason.
+
+     THE SCALE ABOVE IS A TABLE SCALE AND IT JUMPS 13px STRAIGHT TO 16px. That is right for what it
+     was drawn for: a row in a list of two hundred leads, a chip, a column heading. It is wrong for
+     the surfaces that are not tables, and this product now has several of them: an inspection
+     somebody fills in standing on a roof, a diary card, a quote's line items, a note a person
+     typed. At 13px/1.1 those read as squashed, and the fix people reach for is dimming the parts
+     they want to de-emphasise, which makes it worse.
+
+     So this rung exists for READING, and its line height is the point of it rather than its size.
+     `--text-app-md` stays exactly as it is and tables keep it. Use this where a person reads a
+     sentence rather than scans a cell.
+
+     Pilot: `/office/appointments`, 2026-09-24. */
+  --text-app-body: 0.875rem; /* 14px */
+  --text-app-body--line-height: 1.45;
+  --text-app-lg: 1rem; /* 16px */
+  --text-app-lg--line-height: 1.1;
+  --text-app-xl: 1.25rem; /* 20px */
+  --text-app-xl--line-height: 1.1;
+  --text-app-xxl: 1.5rem; /* 24px */
+  --text-app-xxl--line-height: 1.1;
+  /* 32px, and an EIGHTH step is a real addition to a scale that has been seven since it was drawn,
+     so it needs a reason. There is exactly one place on this surface where a line of type is the
+     whole screen rather than a heading on one: the assistant's greeting on a new conversation, with
+     the composer centred under it and nothing else drawn. At 24px that line reads as a page title
+     with a lot of space round it; the screen needs it to read as the thing you came for.
+
+     If a second caller ever appears, check it is genuinely a hero and not a heading that wants to
+     shout. `text-app-xxl` is the largest a HEADING should ever be here. */
+  --text-app-3xl: 2rem; /* 32px */
+  --text-app-3xl--line-height: 1.15;
+}
+
+@theme {
+  /* One step past Tailwind's `2xl` (1536px), for the point where the hero bands stop being a full
+     screen tall and become as tall as their contents.
+
+     Registered as a real breakpoint rather than written as `min-[1800px]:` at the call sites, and
+     that is not tidiness. An arbitrary variant is emitted OUTSIDE the ordered run of the named
+     ones, so `lg:py-20` landed AFTER it in the stylesheet and won at 1900px — the media query
+     matched, the rule existed, and the padding silently never changed. A named breakpoint sorts
+     with the rest and therefore beats every smaller one. */
+  --breakpoint-3xl: 112.5rem; /* 1800px */
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  /* Reserve the scrollbar's width whether or not there is a scrollbar.
+     Anything that locks the page — the mobile menu, a dialog, the home page's intro — sets
+     `overflow: hidden` on this element, which on a classic scrollbar takes ~15px of width away
+     and shoves the entire layout sideways, then back again on release. The gutter is cheap
+     (an empty strip on pages short enough not to scroll, which is almost none of them) and it
+     makes every one of those locks free of layout shift rather than each having to compensate. */
+  html {
+    scrollbar-gutter: stable;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+  /* ── Pointer cursors, once ────────────────────────────────────────────────
+     Tailwind v4 stopped resetting `button { cursor: pointer }` — the browser default is `default`,
+     and Preflight now agrees with it. The result is a dashboard where roughly half the controls
+     say "clickable" under the cursor and half do not, depending on whether whoever wrote that one
+     remembered `cursor-pointer`. Fixing it at each call site is a rule that has to be re-remembered
+     forever; fixing it here is a rule that cannot be forgotten.
+
+     Scoped to things that genuinely activate on click, and skipping anything disabled, where the
+     browser's `not-allowed` is the more useful signal. `[role="option"]` covers Base UI's select
+     and menu items, which are divs. */
+  button:not(:disabled),
+  summary,
+  label[for],
+  [role="button"]:not([aria-disabled="true"]),
+  [role="option"]:not([aria-disabled="true"]),
+  [role="menuitem"]:not([aria-disabled="true"]),
+  [role="tab"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
+  /* Headings: Inter with tight tracking. */
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-heading);
+    letter-spacing: -0.02em;
+  }
+  /* Native buttons default to the arrow cursor — restore the pointer on every
+     interactive element. */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  summary,
+  label[for] {
+    cursor: pointer;
+  }
+}
+
+/* ── One thin scrollbar, everywhere ──────────────────────────────────────────
+   EVERY SURFACE: the website and, in contractor-sites, the dashboard too, which adds its own
+   variations on top in its `globals.css`.
+
+   This used to be a 12px bar scoped to the dashboard, on the argument that a wide bar is easier to
+   grab and is the only thing saying which of three independent scroll regions you are in. Both are
+   true and neither survives looking at the screen: a 12px bar with an 8px thumb is a piece of
+   furniture down the side of every column, and on a record page with three scrolling columns you get
+   three of them. The reference draws a hairline and the region you are in is obvious from the
+   pointer. The marketing site was on the browser default, so the two halves of the product did not
+   even agree with each other.
+
+   4px OF INK IN AN 8px TARGET. The thumb is inset by a transparent border rather than made narrow,
+   so it stays as easy to hit as the ink is quiet to look at — `background-clip: padding-box` is what
+   keeps that border transparent instead of painting the thumb colour under it.
+
+   `scrollbar-width: thin` and `scrollbar-color` are the Firefox half; the `::-webkit-` rules are
+   Chrome and Safari. Both are needed and neither covers the other. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--border);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  border-radius: 999px;
+}
+
+/* Darker under the pointer, so a bar you are reaching for confirms it is a thing you can hold. */
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--input);
+}

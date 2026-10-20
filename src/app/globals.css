@@ -1,0 +1,430 @@
+@import "tailwindcss";
+/* shadcn's animations and variants, then the base tokens copied from contractor-sites' template
+   package (`styles/base-tokens.css`): the shadcn colour variables, the `dark:` / `app:` /
+   `hover-hover:` variants the primitives use, and the base layer. Everything below is the app
+   surface on top. */
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "../styles/base-tokens.css";
+/* OUR design language (docs/DESIGN-LANGUAGE.md). Takes effect only inside `[data-design]`, and
+   shares nothing with the template's tokens above. */
+@import "../design/tokens.css";
+
+/* The base tokens name `--font-inter` (contractor-sites loads it with the template's fonts). Here
+   the one Inter is `designInter` (`src/design/fonts.ts`), attached to <html> as `--font-design`. */
+:root {
+  --font-inter: var(--font-design);
+}
+
+/* ------------------------------------------------------------------ the app surface (Notion) ---
+   The signed-in product — `/office`, `/admin`, and the auth pages that lead into them — is a
+   different design problem from the marketing template, and this is the one place that says so.
+
+   The template is an ADVERT: warm paper, Sebenta set large, 12px radii, generous air. It has to look
+   designed in the four seconds before somebody decides whether to trust a roofer. The app is a TOOL
+   somebody has open all day while a customer is on the phone, and the qualities that sell a website
+   actively cost you there — a display serif is slower to scan, and 12px radii on a 32px row read as
+   a stack of pills rather than a table.
+
+   So this block retunes the density to Notion's, which is the reference `docs/DESIGN-SYSTEM.md` names:
+   14px body, 12px meta, ~4px radii, hairline rules, sans throughout.
+
+   WHY IT IS TOKEN OVERRIDES AND NOT A SECOND COMPONENT SET. Every primitive already derives from
+   these variables — `rounded-sm` is `calc(var(--radius) - 4px)`, headings read `--font-heading` —
+   so redefining three values inside one attribute restyles `Button`, `Input`, `Select`, `Dialog`
+   and everything built on them, in both surfaces, with no forked variants to keep in sync and no
+   call-site churn. Adding `data-surface="app"` to a layout is the entire opt-in.
+
+   IT NOW RETUNES COLOUR TOO, which it deliberately did not when this block only served the auth
+   pages. Density alone gets you a compact version of the marketing palette, and on a full working
+   screen that palette is actively wrong: warm paper behind near-white cards is a brochure's idea of
+   depth, and Notion has no cards at all. It separates a page from its chrome with a flat grey
+   sidebar and hairline rules, and spends its entire contrast budget on the text.
+
+   The BRAND tokens are untouched, so the one accent on the screen is still the tenant's. What
+   changes is everything the accent sits on. */
+[data-surface="app"] {
+  /* 8px, which makes `--radius-sm` 4px, the corner a 32px row wants. The marketing 12px stays 12px. */
+  --radius: 0.5rem;
+  /* No display serif in a tool, and no heading FACE at all. A title here is a size and a weight,
+     which is the entire typographic system on this surface. `docs/DESIGN-SYSTEM.md` rule 1. */
+  --font-heading: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+
+  /* ── Greys: neutral, no hue, no chroma ────────────────────────────────────
+     This block used to carry Notion's warm greys (hue 75, a trace of chroma in every step) because
+     the reference was Notion. The reference is now Twenty, and its greys are dead neutral: pure
+     equal-channel values, zero chroma, nothing borrowed from paper.
+
+     That is not a small difference and it is not arbitrary. A warm grey says "document". A neutral
+     grey says "instrument". This surface is something somebody stares at while a customer is on the
+     phone, and the warmth was quietly costing legibility at the exact contrast levels a dense table
+     lives at. Hex equivalents and the source files are tabulated in `docs/DESIGN-SYSTEM.md`.
+
+     THREE OF THESE DO NEARLY ALL THE WORK: 0.958 is the hairline between two rows, 0.940 is a real
+     border, 0.323 is the text. The rest is trim. */
+  --background: oklch(1 0 0); /* gray1  #FFFFFF */
+  --foreground: oklch(0.323 0 0); /* gray12 #333333 */
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.323 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.323 0 0);
+  --muted: oklch(0.958 0 0); /* gray4  #F1F1F1 */
+  --muted-foreground: oklch(0.51 0 0); /* gray11 #666666 */
+  --secondary: oklch(0.958 0 0);
+  --secondary-foreground: oklch(0.323 0 0);
+  --accent: oklch(0.94 0 0); /* gray5  #EBEBEB */
+  --accent-foreground: oklch(0.323 0 0);
+
+  /* A HAIRLINE, not a line. It exists to stop two rows touching, not to draw a box, and at the
+     marketing surface's weight a dense table turns into graph paper. `--border` is Twenty's
+     `border.color.medium`; the fainter `border.color.light` its table cells use is `--app-hairline`
+     below, because a 32px row needs the quieter of the two. */
+  --border: oklch(0.94 0 0); /* gray5  #EBEBEB */
+  --input: oklch(0.876 0 0); /* gray6  #D6D6D6, also the scrollbar thumb */
+
+  /* The chrome the page sits in: one flat grey panel, no border of its own where it can be avoided.
+     Twenty's whole app frame is this one grey with the page floating white inside it. */
+  --sidebar: oklch(0.982 0 0); /* gray3  #F9F9F9 */
+  --sidebar-foreground: oklch(0.51 0 0);
+  --sidebar-accent: oklch(0 0 0 / 3.9%);
+  --sidebar-accent-foreground: oklch(0.323 0 0);
+  --sidebar-border: oklch(0.94 0 0);
+
+  /* The wash under every row, nav item and menu entry, and the only feedback most of the surface
+     gives. ALPHA, NOT A SOLID, which is the change worth noticing: transparent black lands correctly
+     on white page, grey sidebar and selected row alike, so one token covers what would otherwise be
+     three that drift apart. */
+  --app-hover: oklch(0 0 0 / 3.9%);
+
+  /* THE ACCENT PAIR IS PINNED TO THE BRAND PAIR, which it was silently not.
+     `[data-theme="slate"]` and its siblings point `--primary` at `--brand`, but no dashboard sets a
+     `data-theme` — that is a marketing wrapper — so on this surface `--primary` fell through to the
+     root's untuned marketing blue while everything reading `text-brand` used the tuned one. In light
+     the two happened to hold the same value and the split was invisible. In dark it is not: the dark
+     block below lifts `--brand` to 0.7 so it carries on ink, `--primary` stayed at 0.48, and a
+     `variant="default"` button ended up a different blue from the link beside it.
+
+     Written as `var()` and not as literals on purpose. The dark block redefines the brand pair, so
+     these two follow it without being restated. */
+  --primary: var(--brand);
+  --primary-foreground: var(--brand-foreground);
+  --ring: var(--brand);
+
+  /* ── Structure ────────────────────────────────────────────────────────────
+     The numbers a dense product is actually made of. Named here rather than typed at call sites so
+     that "how tall is a row" has one answer, and changing it is one line rather than a search. */
+  --app-row-h: 32px; /* the number the whole dense feel rests on */
+  --app-cell-px: 8px;
+  --app-gap: 2px; /* between two adjacent chips or rows */
+  --app-panel-w: 500px;
+  --app-checkbox-col: 28px;
+  --app-grip-col: 12px;
+
+  /**
+   * The greys the tables and quiet chrome need that shadcn has no name for.
+   *
+   * **THESE ARE NOT TEXT COLOURS AND THE NAMES ARE A LEFTOVER.** They colour icons, separators,
+   * disabled states and quiet marks. Anything a person READS is `--muted-foreground` or darker;
+   * `surface-scale.test.ts` fails the build if a `text-app-*` size ever appears on the same element
+   * as one of these again. They earned that guard: the inbox, the social screens and integrations
+   * had between them fifty-six uses of a grey that fails WCAG AA at every size, and not one use of
+   * the passing one.
+   *
+   * **DARKENED ONE STEP IN BOTH THEMES, AND LIGHT WAS THE BAD ONE.** `--app-text-tertiary` was
+   * 2.85:1 on white against the 3:1 that WCAG 1.4.11 asks of a meaningful icon, and
+   * `--app-text-extra-light` was 1.61:1, which is not a colour so much as a rumour. The ladder keeps
+   * its order and its spacing; every rung moved down together.
+   *
+   * **`--app-hairline` IS DELIBERATELY UNCHANGED.** It is the cell rule, and a cell rule that
+   * becomes visible turns a dense table into a grid. It is the one grey here whose job is to be
+   * almost invisible, and the dense feel of the jobs board rests on it.
+   */
+  --app-hairline: oklch(0.958 0 0); /* gray4, the cell rule — see above, do not darken */
+  --app-text-tertiary: oklch(0.62 0 0); /* quiet labels and small icons     3.64:1 on white */
+  --app-text-light: oklch(0.69 0 0); /* quieter still                    2.77:1 */
+  --app-text-extra-light: oklch(0.77 0 0); /* present but inert: a disabled chevron  2.07:1 */
+  --app-border-strong: oklch(0.82 0 0); /* a line meant to be seen: the nav tree connector 1.75:1 */
+
+  /* ── Type ─────────────────────────────────────────────────────────────────
+     One family, three weights, seven sizes.
+
+     THE REFERENCE'S SCALE IS WRITTEN AGAINST A 13px ROOT, NOT 16, and this is the single easiest
+     thing to copy wrongly. Its `index.css` opens with `html { font-size: 13px }`, so the odd-looking
+     `0.92rem` in its theme file is not 14.7px, it is 12. Read the rem values without that line and
+     every size on the surface comes out roughly a quarter too big, which is exactly the wrong
+     direction for a product whose whole argument is density.
+
+     Restating the root here is not an option: Tailwind's spacing scale is rem too, so a 13px root
+     would silently shrink every gap and every height by the same quarter.
+
+     THE SCALE ITSELF LIVES IN `@theme` further up, as `--text-app-*`, not here. It has to: a variable
+     declared inside this block only resolves on this surface, and `text-(length:--app-text-md)` in a
+     shared primitive would compute to nothing the moment that primitive rendered on the marketing
+     site. Registered in the theme it becomes an ordinary `text-app-md` utility that always resolves,
+     which is what a primitive can safely reach for. */
+  --app-leading-tight: 1.1;
+  --app-leading-prose: 1.5;
+
+  /* ── Motion ───────────────────────────────────────────────────────────────
+     Three durations and no fourth. `--app-press` is the important one: a single transition shared by
+     every clickable thing on the surface. Most of the polish people notice in a product like this is
+     that one line applied everywhere, not a motion library. */
+  --app-dur-instant: 75ms;
+  --app-dur-fast: 150ms;
+  --app-dur-normal: 300ms;
+  --app-press: background 0.1s ease;
+
+  /* ── Depth ────────────────────────────────────────────────────────────────
+     Built from transparent black at the reference's exact alphas, so a shadow works on any surface
+     rather than assuming white underneath. */
+  --app-shadow-light: 0 2px 4px 0 rgb(0 0 0 / 0.039), 0 0 4px 0 rgb(0 0 0 / 0.078);
+  --app-shadow-strong: 2px 4px 16px 0 rgb(0 0 0 / 0.161), 0 2px 4px 0 rgb(0 0 0 / 0.078);
+
+  /* Frosted overlays: dropdowns and popovers are half-transparent over a blur rather than opaque
+     panels. Consumed in layer 1 when the primitives are retuned; declared here so both themes state
+     it in the same place. */
+  --app-overlay-bg: rgb(255 255 255 / 0.5);
+  --app-overlay-blur: blur(12px) saturate(200%) contrast(50%) brightness(130%);
+}
+
+/* THE HEADING CONCEPT IS SWITCHED OFF HERE, and this is a bug fix as much as a decision.
+   `h1..h4` get the heading family and `-0.02em` tracking further down in `@layer base`. On the
+   marketing template that is the point. On the dashboard it meant a dialog was set in a different
+   voice from the table behind it, because Base UI's `Dialog.Title` renders an `<h2>` and shadcn's
+   `DialogTitle` also asks for `font-heading` by class. Two routes to the same wrong answer.
+
+   Remapping `--font-heading` above closes the family. This closes the tracking, which is the half
+   that survives a font swap and is the reason a title still looked subtly foreign after one. */
+[data-surface="app"] :is(h1, h2, h3, h4) {
+  letter-spacing: normal;
+}
+
+/* ── Primitive metrics for the app surface ───────────────────────────────────
+   Deleted, and the deletion is the note.
+
+   This block used to hold scoped rules like `[data-surface="app"] [data-slot="input"] { height:
+   32px }` inside `@layer components`, so a call site's utility could still override them. Not one of
+   them ever applied. A component's own base classes are utilities too, and `h-7` in `input.tsx` beat
+   every rule here. Layers cannot separate "the component's default" from "the call site's override",
+   because both are the same kind of thing.
+
+   The numbers now live in the components, written with the `app:` variant declared at the top of
+   this file, where they are also visible to whoever opens the component. `docs/DESIGN-SYSTEM.md`
+   layer 1. */
+
+/* ── The app is a frame, not a document ──────────────────────────────────────
+   `AppShell` is `h-dvh` with its page column as the scroll region, so `html` here scrolls nothing.
+   Two consequences, both deliberate.
+
+   NO RESERVED GUTTER. The stable gutter below exists for the marketing site, where a modal setting
+   `overflow: hidden` would otherwise shove the layout sideways. On this surface it did active harm:
+   a `position: fixed` element's `right: 0` resolves against the initial containing block, which
+   excludes the reserved gutter — so the side peek sat a scrollbar's width in from the edge and no
+   amount of `right-0` could move it.
+
+   `overflow: hidden` on both, so a stray tall child cannot start the document scrolling again and
+   hand us back the second scrollbar. */
+html[data-surface="app"],
+html[data-surface="app"] body {
+  height: 100%;
+  overflow: hidden;
+  scrollbar-gutter: auto;
+}
+
+/* ── A field list only reserves an icon column when something in it has an icon ───────────────
+   Every `PropertyRow` keeps a 16px box for its icon so that rows with one line up with rows
+   without. That is right in the record's field column, where everything has an icon. In a side
+   panel nothing does — Status, Due, Priority, Owner are all bare — and every label then sat 20px in
+   from the edge behind an empty gutter.
+
+   THE DECISION BELONGS TO THE LIST, not the row, and a row cannot see its siblings. `:has()` is how
+   a container reacts to what is inside it; the full-bleed page and the top bar already work this
+   way. `> *` rather than `:not(:empty)` because the box always has a text node's worth of
+   whitespace in it — what distinguishes a filled box is an element child, which is the svg. */
+[data-slot="property-list"]:not(:has([data-slot="property-icon"] > *))
+  [data-slot="property-icon"] {
+  display: none;
+}
+
+/* The site-wide thin scrollbar lives in the template (`styles/tokens.css`), because a client's site
+   wears it too. What follows is only the dashboard's own variation on it. */
+[data-surface="app"] ::-webkit-scrollbar-thumb:hover,
+[data-surface="app"]::-webkit-scrollbar-thumb:hover {
+  background-color: var(--muted-foreground);
+}
+
+/* Where two scrollbars meet. Left unstyled it is a small grey square that reads as a rendering
+   artefact in the bottom-right of any table that scrolls both ways. */
+[data-surface="app"] ::-webkit-scrollbar-corner,
+[data-surface="app"]::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+.dark [data-surface="app"],
+[data-surface="app"].dark {
+  /* Same move as the light block: the warmth is gone. Every value below is a neutral grey read out
+     of the reference's dark scale, mapped role for role against its light twin. The greys do NOT
+     simply invert. The reference's dark page (0.205) is lighter than a straight flip would give,
+     and its dark borders are proportionally much stronger, because a hairline that reads on white
+     disappears entirely on ink. */
+  --background: oklch(0.205 0 0); /* gray1  #171717 */
+  --foreground: oklch(0.94 0 0); /* gray12 #EBEBEB */
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.94 0 0);
+  --popover: oklch(0.222 0 0); /* gray2  #1B1B1B, one step up so an overlay reads as raised */
+  --popover-foreground: oklch(0.94 0 0);
+  --muted: oklch(0.231 0 0); /* gray4  #1D1D1D */
+  --muted-foreground: oklch(0.767 0 0); /* gray11 #B3B3B3 */
+  --secondary: oklch(0.231 0 0);
+  --secondary-foreground: oklch(0.94 0 0);
+  --accent: oklch(0.251 0 0); /* gray5  #222222 */
+  --accent-foreground: oklch(0.94 0 0);
+  --border: oklch(0.251 0 0);
+  --input: oklch(0.401 0 0); /* gray6  #484848, also the scrollbar thumb */
+  --sidebar: oklch(0.213 0 0); /* gray3  #191919 */
+  --sidebar-foreground: oklch(0.767 0 0);
+  --sidebar-accent: oklch(1 0 0 / 5.9%);
+  --sidebar-accent-foreground: oklch(0.94 0 0);
+  --sidebar-border: oklch(0.251 0 0);
+  --app-hover: oklch(1 0 0 / 5.9%);
+
+  /* Only the values that genuinely differ on ink are restated. Structure, type and motion are
+     theme-independent and stay inherited from the light block. */
+  /**
+   * The same ladder, lifted one step, and on ink it moves the other way: lighter is more contrast
+   * here. Dark mode was always the better half - `--app-text-tertiary` sat at 4.59:1 where its light
+   * twin was 2.85:1 - which is the opposite of what everybody assumes, and is the whole reason the
+   * problem hid: the person who drew it was looking at the dark theme.
+   */
+  --app-hairline: oklch(0.231 0 0); /* gray4, the cell rule — unchanged, same reason as light */
+  --app-text-tertiary: oklch(0.66 0 0); /* 5.76:1 on the dark background */
+  --app-text-light: oklch(0.56 0 0); /* 3.85:1 */
+  --app-text-extra-light: oklch(0.47 0 0); /* 2.62:1 — a disabled chevron, exempt but not absent */
+  --app-border-strong: oklch(0.45 0 0); /* 2.41:1 */
+  --app-shadow-light: 0 2px 4px 0 rgb(255 255 255 / 0.059), 0 0 4px 0 rgb(255 255 255 / 0.102);
+  --app-shadow-strong: 2px 4px 16px 0 rgb(255 255 255 / 0.141), 0 2px 4px 0 rgb(255 255 255 / 0.102);
+  --app-overlay-bg: rgb(0 0 0 / 0.5);
+  --app-overlay-blur: blur(12px) saturate(200%) contrast(100%) brightness(130%);
+
+  /* THE BRAND WASH, WHICH IS THE ONE TOKEN THAT HAD NO DARK VALUE AND SHOWED IT.
+     `--brand-tint` is a near-white blue tuned to sit on paper, and ten places on the dashboards use
+     it as a background with `text-foreground` on top: the "from an enquiry" strip on a job, the
+     selected row on the board, the customer's own message bubble in Support. On ink every one of
+     them came out as a glaring pale slab with near-white text on it - the least readable thing on
+     the screen, and it was carrying the words somebody opened the panel to read.
+
+     Deep and low-chroma rather than a dark blue: it has to read as "this row is picked out" against
+     a 0.21 page, not as a blue box. */
+  --brand-tint: oklch(0.29 0.045 258);
+
+  /* THE ACCENT INVERTS, AS A PAIR, AND IT HAS TO BE AS A PAIR.
+     `--brand` is a mid blue drawn for white paper, and on the dashboards it does two jobs at once:
+     it is the colour of about forty links and icons (`text-brand`), and it is the fill behind the
+     sidebar's initials tile and the unread badge, where `--brand-foreground` writes on top of it.
+     On ink those two jobs want opposite things - as text it needs to be lighter, as a fill under
+     light text it needs to stay dark - which is why lifting `--brand` alone is a trap and was the
+     first thing tried here.
+
+     Flipping BOTH resolves it. The accent becomes a bright blue that carries as text on a 0.21
+     page, and the thing written on top of it becomes near-black instead of near-white. Every
+     existing `bg-brand text-brand-foreground` pairing stays legible without a single call site
+     changing, which is the test a token change has to pass.
+
+     Safe because no dashboard sets a `[data-theme]` brand preset - the cockpit and the client
+     dashboard both run on the default slate, and the tenant's own colours only reach their public
+     website, which never goes dark. */
+  --brand: oklch(0.7 0.16 258);
+  --brand-strong: oklch(0.79 0.14 258);
+  --brand-foreground: oklch(0.16 0.03 258);
+}
+
+/* ── Empty-state pictures (`components/app/empty-art.tsx`) ─────────────────
+   Every fill is the contractor's `--brand` mixed toward paper or ink, so the set re-colours itself
+   per company. Ink and paper are FIXED, not the theme's foreground and background: the outline is a
+   printed black line in dark mode too, which is what makes the pictures read as illustrations
+   rather than as UI. Twenty, the reference, does the same. */
+.empty-art {
+  --art-ink: oklch(0.2 0.005 60);
+  --art-paper: color-mix(in oklch, var(--brand) 10%, oklch(1 0 0));
+  --art-front: color-mix(in oklch, var(--brand) 35%, oklch(1 0 0));
+  --art-side: color-mix(in oklch, var(--brand) 70%, oklch(1 0 0));
+  --art-deep: color-mix(in oklch, var(--brand) 75%, var(--art-ink));
+}
+
+.empty-art-blob,
+.empty-art-object,
+.empty-art-badge {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+/* Plays once, then everything is still: the backdrop fades up, the object drops in with a small
+   overshoot, the badge pops last. The mouse lean is `translate`, set from script, and these use
+   `transform` and `scale`, so the two never fight over one property. */
+.empty-art-blob {
+  animation: empty-art-blob 450ms ease-out both;
+  transition: translate 400ms ease-out;
+}
+.empty-art-object {
+  animation: empty-art-drop 650ms cubic-bezier(0.34, 1.5, 0.64, 1) 90ms both;
+  transition: translate 400ms ease-out;
+}
+.empty-art-badge {
+  animation: empty-art-pop 380ms cubic-bezier(0.34, 1.8, 0.64, 1) 520ms both;
+}
+
+@keyframes empty-art-blob {
+  from {
+    opacity: 0;
+    scale: 0.82;
+  }
+}
+@keyframes empty-art-drop {
+  from {
+    opacity: 0;
+    transform: translateY(-14px);
+  }
+}
+@keyframes empty-art-pop {
+  from {
+    opacity: 0;
+    scale: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .empty-art-blob,
+  .empty-art-object,
+  .empty-art-badge {
+    animation: none;
+    transition: none;
+  }
+}
+
+/* ── A page not rebuilt in the new design language yet ──────────────────────────────────────────
+   The office frame is now drawn in the new language (src/design/, docs/DESIGN-LANGUAGE.md), and its
+   root carries `data-design`, which sets its own font, size and tracking for everything inside. The
+   page column has not been rebuilt yet, so it puts back what those pages were written against: the
+   app font at the browser's 16px, normal tracking. Delete this when the last page has moved over. */
+[data-design] .legacy-surface {
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  line-height: 1.5;
+  letter-spacing: normal;
+}
+
+/* ── A page rebuilt in the new design language, inside the office ───────────────────────────────
+   The inverse of `.legacy-surface`: puts the new language's type back for a page that has moved
+   over (`DesignPage` in src/design/page.tsx). Same values as `[data-design]` itself. */
+[data-design] .design-surface {
+  font-family: var(--font-design), ui-sans-serif, system-ui, sans-serif;
+  font-size: var(--ds-t-body);
+  line-height: var(--ds-l-body);
+  letter-spacing: -0.011em;
+  color: var(--ds-label);
+}
+[data-design] .design-surface :where(h1, h2, h3, h4, h5, h6) {
+  font-family: inherit;
+  letter-spacing: inherit;
+  font-weight: inherit;
+}
