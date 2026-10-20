@@ -27,7 +27,7 @@ async function Batch({ params }: { params: Promise<{ id: string }> }) {
       <BatchLive batchId={batch.id} />
       <ListGroup>
         {batch.brands.map((b, i) => (
-          <ListRow key={b.id} first={i === 0} title={b.name} trailing={<Pill tone={progressTone(b)}>{progressText(b)}</Pill>} />
+          <ListRow key={b.id} first={i === 0} href={`/brands/${b.id}`} title={b.name} trailing={<Pill tone={progressTone(b)}>{progressText(b)}</Pill>} />
         ))}
       </ListGroup>
     </>
