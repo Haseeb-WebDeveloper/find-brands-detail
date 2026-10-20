@@ -36,7 +36,7 @@ export function ResearchLog({ lines, showBrand = false, live = false }: { lines:
           </span>
         ) : null}
       </h2>
-      <div className="max-h-[28rem] overflow-y-auto rounded-card bg-surface p-2">
+      <div className="rounded-card bg-surface p-2">
         {lines.length === 0 ? (
           <p className="px-2 py-3 text-callout text-label-secondary">Nothing yet. Lines appear here as the research runs.</p>
         ) : (
