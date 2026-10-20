@@ -9,7 +9,8 @@ import { requireMember } from "@/lib/auth/scope";
 import { getBatch } from "@/lib/batches/scoped";
 import { progressText, progressTone } from "@/lib/brands/progress";
 import { RowsLoading } from "@/components/app/shell/page-skeletons";
-import { BatchLive } from "./batch-live";
+import { LiveRefresh } from "@/components/app/live-refresh";
+import { batchTopic } from "@/lib/realtime/channels";
 
 export const metadata: Metadata = { title: "Batch" };
 
@@ -24,7 +25,7 @@ async function Batch({ params }: { params: Promise<{ id: string }> }) {
   return (
     <>
       <PageHeader title={`Batch started ${sayAgo(batch.createdAt)}`} back={{ href: "/batches", label: "Batches" }} />
-      <BatchLive batchId={batch.id} />
+      <LiveRefresh topic={batchTopic(batch.id)} />
       <ListGroup>
         {batch.brands.map((b, i) => (
           <ListRow key={b.id} first={i === 0} href={`/brands/${b.id}`} title={b.name} trailing={<Pill tone={progressTone(b)}>{progressText(b)}</Pill>} />

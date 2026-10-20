@@ -4,15 +4,14 @@ import { useEffect, useRef } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/auth/supabase-browser";
-import { BRAND_EVENTS, batchTopic } from "@/lib/realtime/channels";
+import { BRAND_EVENTS } from "@/lib/realtime/channels";
 
 /**
- * Listens on the batch's private channel and re-renders from the server on every change, after
- * contractor-sites' `support-live.tsx`. The message carries ids only; nothing shown comes from
- * Realtime. Refreshes are coalesced so 25 brands finishing steps at once cause a handful of renders,
- * not hundreds.
+ * Re-renders the page from the server whenever a `brand:changed` broadcast arrives on `topic`
+ * (contractor-sites' `support-live.tsx` pattern). The message carries ids only; nothing shown
+ * comes from Realtime. Refreshes are coalesced, so a burst of steps causes a few renders.
  */
-export function BatchLive({ batchId }: { batchId: string }) {
+export function LiveRefresh({ topic }: { topic: string }) {
   const router = useRouter();
   const routerRef = useRef(router);
   useEffect(() => {
@@ -36,11 +35,11 @@ export function BatchLive({ batchId }: { batchId: string }) {
     void (async () => {
       await supabase.realtime.setAuth();
       if (cancelled) return;
-      channel = supabase.channel(batchTopic(batchId), { config: { private: true } });
+      channel = supabase.channel(topic, { config: { private: true } });
       channel.on("broadcast", { event: BRAND_EVENTS.CHANGED }, refreshSoon);
       channel.subscribe((status, error) => {
         if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
-          console.warn("[realtime] batch channel", status, error?.message ?? "");
+          console.warn("[realtime]", topic, status, error?.message ?? "");
         }
       });
     })();
@@ -50,7 +49,7 @@ export function BatchLive({ batchId }: { batchId: string }) {
       if (timer) clearTimeout(timer);
       if (channel) void supabase.removeChannel(channel);
     };
-  }, [batchId]);
+  }, [topic]);
 
   return null;
 }

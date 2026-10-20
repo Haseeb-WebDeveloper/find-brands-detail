@@ -5,7 +5,10 @@ import { Suspense } from "react";
 import { DesignPage } from "@/design/page";
 import { PageHeader } from "@/design/page-header";
 import { ListGroup, ListRow, Pill } from "@/design/list";
-import { requireMember } from "@/lib/auth/scope";
+import { requireMember, scopeCan } from "@/lib/auth/scope";
+import { brandTopic } from "@/lib/realtime/channels";
+import { LiveRefresh } from "@/components/app/live-refresh";
+import { RetryButton } from "./retry-button";
 import { getBrandDetail } from "@/lib/brands/scoped";
 import { progressText, progressTone } from "@/lib/brands/progress";
 import { RowsLoading } from "@/components/app/shell/page-skeletons";
@@ -31,8 +34,16 @@ async function Brand({ params }: { params: Promise<{ id: string }> }) {
       <PageHeader
         title={brand.name}
         back={{ href: `/batches/${brand.batchId}`, label: "Batch" }}
-        actions={<Pill tone={progressTone(brand)}>{progressText(brand)}</Pill>}
+        actions={
+          <div className="flex items-center gap-2">
+            <Pill tone={progressTone(brand)}>{progressText(brand)}</Pill>
+            {scopeCan(scope, "batches:write") && brand.status !== "queued" && brand.status !== "researching" ? (
+              <RetryButton brandId={brand.id} />
+            ) : null}
+          </div>
+        }
       />
+      <LiveRefresh topic={brandTopic(brand.id)} />
 
       <section className="flex flex-col gap-2">
         <h2 className="text-headline text-label">Website</h2>
