@@ -1,7 +1,7 @@
 # Brand Enrich — Design
 
 **Date:** 2026-10-16
-**Status:** Approved in brainstorming, awaiting spec review
+**Status:** Approved 2026-10-16; revised 2026-10-20 (Supabase Auth magic link, Prisma, broadcast Realtime, contractor-sites conventions)
 
 ## 1. Purpose
 
@@ -41,7 +41,7 @@ db-admin, image hosting (image URLs are kept as found).
 | Topic | Decision |
 |---|---|
 | Input | Paste brand names, one per line, optionally `Name, website` |
-| Users | One shared password; no individual accounts or approval history |
+| Users | Supabase Auth, **magic link (email) only**, **invite-only**. Roles `owner` (can invite and remove) and `member`. The first owner is created by a one-off bootstrap command (revised 2026-10-20) |
 | Campaign definition | Anything with a distinct visual campaign: ambassadors, collaborations, seasonal campaigns, hero product launches with campaign imagery, pop-ups. Skip sales, retail expansion and promotions without imagery |
 | Campaign recency | No age limit; most recent first |
 | Campaign images | Brand-owned sources first (brand site, press pages, brand Instagram); any other source as a fallback, labelled third-party |
@@ -50,20 +50,29 @@ db-admin, image hosting (image URLs are kept as found).
 | TikTok data | Free link-preview check; Playwright on a GitHub Actions runner for badge and bio link |
 | Hosting | Vercel (app), Supabase (database, Realtime), Inngest (jobs), GitHub Actions (browser runner) |
 | Images | URLs kept as found; checked at research time and again at export |
-| Live progress | Supabase Realtime |
+| Live progress | Supabase Realtime **broadcast** on private channels; payloads carry ids only; the page re-renders from the server (revised 2026-10-20) |
+| Database access | **Prisma 7** with `@prisma/adapter-pg` (setup copied from DB-mvp). The browser reads no tables (revised 2026-10-20) |
+| UI and conventions | Copied from `F:\projects\personal\contractor-sites` (§13) |
 
 ## 4. Architecture
 
-- **Next.js app on Vercel:** screens (login, new batch, batch view, brand review,
-  export) and API routes.
-- **Supabase Postgres:** batches, brands, candidates, selections, campaigns.
+- **Next.js app on Vercel:** screens (login, team, new batch, batch view, brand review,
+  export), server actions and API routes. Next 16 with `cacheComponents` and the React
+  Compiler.
+- **Supabase:** Auth (magic link), Postgres, Realtime broadcast.
+- **Prisma 7:** every read and write happens in server code. Prisma connects as the
+  table owner and bypasses RLS, so authorization is enforced in application code: every
+  page, server action and reader resolves the signed-in member's scope first (§13).
+- **Database lockdown:** the browser's Supabase key can read and write no table.
+  Every table has RLS enabled with no policies for `anon`/`authenticated`, and privileges
+  are revoked explicitly per table. A verification script proves it (§10).
 - **Inngest:** one job per brand made of named steps; each step retries on its own.
 - **GitHub Actions browser runner:** Playwright jobs (TikTok profiles, JavaScript-only
   sites), dispatched from Inngest, results posted back to an authenticated API route.
   The runner can move to a machine on a residential connection by changing `runs-on`.
 
-Stack follows `F:\projects\personal\leadforge`: TypeScript, Next.js 16 App Router,
-React 19, Tailwind 4, Zod, pnpm, Drizzle ORM, Vitest.
+Stack: TypeScript, Next.js 16 App Router, React 19, Tailwind 4, shadcn on Base UI,
+Zod 4, Prisma 7, Inngest, Vitest, pnpm.
 
 ## 5. Components
 
@@ -89,9 +98,13 @@ checks performed, result, timestamp). Nothing is shown or exported without a sou
 
 ## 6. Data model and flow
 
-**Tables**
+**Tables** (Prisma models; snake_case table and column names via `@@map`/`@map`)
 
-- `batches` — id, created_at, status.
+- `users` — id (= `auth.users.id`), email, role (`owner` | `member`), created_at.
+  Created on first sign-in for an invited email.
+- `invitations` — id, email, role, invited_by, token_hash, expires_at, accepted_at,
+  revoked_at, created_at. An invitation is what lets a new email create an account.
+- `batches` — id, created_by, created_at, status.
 - `brands` — id, batch_id, name, website_hint, status
   (`queued` → `researching` → `needs_review` → `approved` → `exported`), current_step,
   review_count.
@@ -161,24 +174,30 @@ report. Exported brands get status `exported`.
 
 ## 8. Screens
 
-1. **Login** — shared password (Vercel env var); signed session cookie.
-2. **New batch** — paste box; Research button; live per-brand progress.
-3. **Batch view** — one row per brand, coloured cell per field (green proven, amber
+1. **Login** — email field; sends a magic link. A new email can create an account only
+   when it has a pending invitation; the response is the same either way, so addresses
+   can't be probed. Callback routes exchange the link for a session.
+2. **Team** (owners) — invite by email, resend, revoke, remove member, change role.
+   Invitees open `/invite/<token>`, sign in with the invited email, and accept; nothing
+   is accepted on a GET.
+3. **New batch** — paste box; Research button; live per-brand progress.
+4. **Batch view** — one row per brand, coloured cell per field (green proven, amber
    review, red missing), "needs you" count, filters.
-4. **Brand review** — per field: chosen value, preview (images shown with the importer's
+5. **Brand review** — per field: chosen value, preview (images shown with the importer's
    Fill Frame crop), evidence in plain words, other candidates with their evidence,
    typed override (checked immediately). Campaign cards with title, description and
    character count, image picks, source links; approve, edit, remove, reorder, "find
    more". Text fields for description, tier, aesthetic, industry, regions. **Approve
    brand** is enabled only when every required field has a value and nothing is red.
-5. **Export** — select approved brands → validation and live image re-check →
+6. **Export** — select approved brands → validation and live image re-check →
    Download CSV, or a report of what blocked it.
 
-**Live updates:** screens subscribe to Supabase Realtime on `brands`, `candidates`,
-`selections`, `campaigns`, `campaign_images`. After password login the server issues a
-short-lived JWT signed with the Supabase JWT secret; row-level security allows reads
-only with that token, so the public anon key alone reads nothing. Writes go through
-server routes only.
+**Live updates:** after each research step commits, the server broadcasts
+`{ brandId, step }` (ids only, never data) on the private channels `batch:<batchId>`
+and `brand:<brandId>`, using the service-role key server-side only. Signed-in browsers
+subscribe with their own Supabase session (`realtime.setAuth()`); a policy on
+`realtime.messages` admits only members of `public.users`. On a message the page calls
+`router.refresh()` (debounced), so every value shown still comes from server code.
 
 ## 9. Errors and limits
 
@@ -203,12 +222,18 @@ server routes only.
   `@haruharu_wonder` on Instagram (impostor), `@dr.g_official_global` (does not exist).
   One command runs the pipeline on the set and reports accuracy per field.
 - **Export test:** generated CSV passes the copied importer validation.
+- **Lockdown check:** `pnpm verify:lockdown` uses the publishable key against the real
+  project and proves every table returns nothing and accepts no writes, and that a
+  private channel refuses a non-member.
+- **Guard tests:** source-reading tests (contractor-sites style) prove every server
+  action and page under the app resolves the member scope first.
 
 ## 11. Build order
 
 Each step is usable before the next begins.
 
-1. **Scaffold** — repo, password login, Supabase schema, Inngest, Realtime.
+1. **Scaffold** — repo, design system, Supabase Auth (magic link, invites, team page),
+   Prisma schema and lockdown, Inngest, live batch progress.
 2. **Facts** — website, crawl, Instagram, TikTok (with runner), logo and cover,
    scoring; measured on the test set.
 3. **Campaigns** — Gemini research, source-page images, Instagram posts, scoring.
@@ -225,3 +250,42 @@ Each step is usable before the next begins.
   volume and slow pacing keep the risk low; blocks degrade to review, never to guesses.
 - **Expiring image links:** Instagram CDN links expire in about four days; export
   re-checks every link and import should follow export promptly.
+- **Supabase keys:** `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+  (browser, auth and Realtime only), `SUPABASE_SERVICE_ROLE_KEY` (server only,
+  broadcasts only), `DATABASE_URL` (Transaction pooler, port 6543, `pgbouncer=true`),
+  `DIRECT_URL` (port 5432, migrations only).
+- **Default privileges:** `ALTER DEFAULT PRIVILEGES` has silently not applied on the
+  product database before, so lockdown is per-table revokes plus the verification
+  script, never default privileges alone.
+
+## 13. Conventions (from contractor-sites)
+
+Copied from `F:\projects\personal\contractor-sites`, adapted to one team instead of many
+companies:
+
+- **Next.js 16:** `cacheComponents: true`, `reactCompiler: true`, named `cacheLife`
+  profiles. Dashboard reads are deliberately uncached (live data); per-request dedupe
+  with React `cache()`; every route has a `loading.tsx` drawn from shared skeletons;
+  layouts pass promises to the shell, which unwraps them under Suspense.
+- **Auth files:** `lib/auth/config.ts` (env names), `supabase-browser.ts` (auth and
+  Realtime only), `supabase-server.ts` (auth only), `supabase-proxy.ts`
+  (`refreshSession`), `session.ts` (`currentSession = cache(...)` using `getClaims()`),
+  `actions.ts` (magic link, sign-out), `invite.ts` (pure token helpers, tested),
+  callback routes `auth/callback` and `auth/confirm`. `src/proxy.ts` refreshes the
+  session and redirects signed-out visitors; it is not the authorization boundary.
+- **Scope:** branded `TeamScope` (`userId`, `email`, `role`) from
+  `getTeamScope = cache(...)`; `requireMember()` redirects to `/login`;
+  `scopeCan(scope, permission)` over a `resource:verb` permission union. Every page,
+  action and reader takes or resolves the scope first.
+- **Data layer per feature:** `lib/<feature>/scoped.ts` (server-only readers taking
+  `scope` first), `store.ts` (server-only writes), `actions.ts` (thin `"use server"`,
+  re-check permission on the first line, return `{ ok: true } | { ok: false; error }`,
+  never throw, revalidate after writes). Pure rule files get `*.test.ts` siblings.
+- **UI:** the `src/design` system (tokens, `DesignRoot`, Button, PageHeader,
+  DesignPage, DataTable, Empty, TextField, Sheet, Dialog, Menu, Pill, ListGroup,
+  `useToast`, `<Icon>` over lucide) and shadcn on Base UI with contractor-sites'
+  `components.json`; tokens only, no literal colours; `next/link` only; forms are client
+  components with `useState` + `useTransition` calling a server action.
+- **Inngest:** events declared with Zod schemas carrying ids only; functions in
+  `lib/inngest/functions/*.ts` registered in `functions/index.ts`.
+- **Docs:** `AGENTS.md` holds the rules; reasoning lives in docblocks beside the code.
