@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 3005",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
@@ -17,7 +17,7 @@
     "db:migrate:deploy": "prisma migrate deploy",
     "bootstrap": "tsx scripts/bootstrap-owner.ts",
     "verify:lockdown": "tsx scripts/verify-lockdown.ts",
-    "inngest:dev": "pnpm dlx inngest-cli@latest dev -u http://localhost:3000/api/inngest"
+    "inngest:dev": "pnpm dlx inngest-cli@latest dev -u http://localhost:3005/api/inngest"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",

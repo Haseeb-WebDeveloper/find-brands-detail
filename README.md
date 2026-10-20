@@ -6,14 +6,16 @@ Design: `docs/superpowers/specs/2026-10-16-brand-enrich-design.md`. Rules: `AGEN
 ## Setup
 
 1. **Supabase project:** copy the values listed in `.env.example` into `.env.local`.
-2. **Supabase → Authentication → URL Configuration:** Site URL `http://localhost:3000`; add
-   `http://localhost:3000/auth/callback` and `http://localhost:3000/auth/confirm` to Redirect URLs.
+2. **Supabase → Authentication → URL Configuration:** Site URL `http://localhost:3005`; add
+   `http://localhost:3005/**` to Redirect URLs (the magic link returns to `/auth/callback`).
+   Port 3005 because 3000/3001 are often taken by other local apps; `pnpm dev` pins it.
 3. **Supabase → Realtime → Settings:** turn off "Allow public access" so only private channels work.
 4. `pnpm install`
 5. `pnpm db:migrate:deploy` (schema, then lockdown), then `pnpm verify:lockdown`.
 6. `pnpm bootstrap you@company.com` — the first owner's invitation.
-7. `pnpm dev`, and `pnpm inngest:dev` in a second terminal.
-8. Sign in at `http://localhost:3000/login` with the bootstrap email.
+7. Make sure `.env.local` has `INNGEST_DEV=1`, then `pnpm dev` and `pnpm inngest:dev` in a
+   second terminal (Inngest's local dashboard: `http://localhost:8288`).
+8. Sign in at `http://localhost:3005/login` with the bootstrap email.
 
 ## Deploy
 
