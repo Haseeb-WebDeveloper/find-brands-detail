@@ -27,7 +27,7 @@ async function Brand({ params }: { params: Promise<{ id: string }> }) {
 
   const live = brand.pages.filter((p) => p.source === "live");
   const archived = brand.pages.filter((p) => p.source === "archive");
-  const found = (key: "instagram" | "tiktok") => [...new Set(brand.pages.flatMap((p) => p.facts[key] ?? []))];
+  const found = (key: "tiktok") => [...new Set(brand.pages.flatMap((p) => p.facts[key] ?? []))];
 
   return (
     <>
@@ -72,15 +72,47 @@ async function Brand({ params }: { params: Promise<{ id: string }> }) {
       </section>
 
       <section className="flex flex-col gap-2">
+        <h2 className="text-headline text-label">Instagram</h2>
+        {brand.instagram.candidates.length === 0 ? (
+          <p className="text-callout text-label-secondary">No Instagram account checked yet.</p>
+        ) : (
+          <ListGroup>
+            {brand.instagram.candidates.map((c, i) => {
+              const e = c.evidence as { followers?: number | null; name?: string | null; verified?: boolean | null; bioReached?: string | null };
+              const facts = [
+                e.name,
+                typeof e.followers === "number" ? `${e.followers.toLocaleString("en-US")} followers` : null,
+                e.verified === true ? "verified badge" : e.verified === false ? "no badge" : null,
+                e.bioReached ? `bio reaches ${e.bioReached}` : null,
+              ].filter(Boolean);
+              return (
+                <ListRow
+                  key={c.id}
+                  first={i === 0}
+                  title={
+                    <span className="flex items-center gap-2">
+                      {c.id === brand.instagram.selectedCandidateId ? <Pill tone="blue">Chosen</Pill> : null}
+                      <Link href={`https://www.instagram.com/${c.value}/`} target="_blank" rel="noreferrer" className="underline-offset-4 hover:underline">
+                        @{c.value}
+                      </Link>
+                    </span>
+                  }
+                  detail={`${c.reason} · ${c.source}${facts.length ? ` · ${facts.join(" · ")}` : ""}`}
+                  trailing={<Pill tone={TONE[c.score]}>{LABEL[c.score]}</Pill>}
+                />
+              );
+            })}
+          </ListGroup>
+        )}
+      </section>
+
+      <section className="flex flex-col gap-2">
         <h2 className="text-headline text-label">Found on the brand&apos;s sites</h2>
         <ListGroup>
-          <ListRow first title="Instagram" detail={found("instagram").map((h) => `@${h}`).join(", ") || "None linked"} />
-          <ListRow title="TikTok" detail={found("tiktok").map((h) => `@${h}`).join(", ") || "None linked"} />
+          <ListRow first title="TikTok" detail={found("tiktok").map((h) => `@${h}`).join(", ") || "None linked"} />
           <ListRow title="Pages read" detail={`${live.length} live${archived.length ? `, ${archived.length} from the Wayback Machine` : ""}`} />
         </ListGroup>
-        <p className="text-footnote text-label-secondary">
-          Instagram, TikTok, logo and cover are checked in the next build steps; this shows what the site links to.
-        </p>
+        <p className="text-footnote text-label-secondary">TikTok, logo and cover are checked in the next build steps.</p>
       </section>
     </>
   );

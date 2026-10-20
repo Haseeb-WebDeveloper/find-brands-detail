@@ -3,6 +3,7 @@ import { brandResearchRequested } from "@/lib/inngest/events";
 import { RESEARCH_STEPS } from "@/lib/research/steps";
 import { failResearch, finishResearch, markStep } from "@/lib/brands/store";
 import { runWebsiteStep } from "@/lib/research/website-step";
+import { runInstagramStep } from "@/lib/research/instagram-step";
 
 /**
  * One job per brand. Each research step is its own Inngest step so a failure retries only that
@@ -25,12 +26,13 @@ export const researchBrand = inngest.createFunction(
     for (const { id } of RESEARCH_STEPS) {
       await step.run(`step:${id}`, async () => {
         await markStep(brandId, id);
-        // Real work so far: the website (which also reads the regional sites — the crawl). The
-        // other steps are still placeholders; later plans fill them in.
+        // Real work so far: the website (which also reads the regional sites — the crawl) and
+        // Instagram. The other steps are still placeholders; later plans fill them in.
         if (id === "website") await runWebsiteStep(brandId);
+        if (id === "instagram") await runInstagramStep(brandId);
       });
       // Placeholder pacing so progress is visible while the remaining steps are empty.
-      if (id !== "website") await step.sleep(`pause:${id}`, "1s");
+      if (id !== "website" && id !== "instagram") await step.sleep(`pause:${id}`, "1s");
     }
     await step.run("finish", () => finishResearch(brandId));
     return { brandId };

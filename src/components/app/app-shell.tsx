@@ -6,6 +6,7 @@ import { allNavLeaves, isAppNavActive } from "@/components/app/nav";
 import { NavFooter, NavTree, type NavBadges } from "@/components/app/nav-tree";
 import { DashboardTheme } from "@/components/app/theme";
 import { WorkspaceMenu } from "@/components/app/workspace-menu";
+import { MetaTokenBanner } from "@/components/app/meta-token-banner";
 import { Button } from "@/design/button";
 import { cn } from "@/design/cn";
 import { Icon } from "@/design/icon";
@@ -32,6 +33,8 @@ export type ShellNav = {
   badges: NavBadges;
   email: string | null;
   role: MemberRole;
+  /** Spec §9: the Meta token's state, for the expiry banner. */
+  metaToken: { configured: boolean; daysLeft: number | null; warn: boolean };
 };
 
 function SidebarInner({
@@ -135,6 +138,12 @@ function TopBar({ nav, children }: { nav: Promise<ShellNav | null>; children?: R
   );
 }
 
+/** Above the page for everyone while the Meta token is missing, expired or in its last week. */
+function TokenBanner({ nav }: { nav: Promise<ShellNav | null> }) {
+  const data = use(nav);
+  return data?.metaToken.warn ? <MetaTokenBanner configured={data.metaToken.configured} daysLeft={data.metaToken.daysLeft} /> : null;
+}
+
 /** Remembered across sessions. */
 const RAIL_KEY = "brand-enrich-sidebar-collapsed";
 
@@ -207,6 +216,10 @@ export function AppShell({ nav, children }: { nav: Promise<ShellNav | null>; chi
                   </Sheet>
                 </div>
               </TopBar>
+
+              <Suspense fallback={null}>
+                <TokenBanner nav={nav} />
+              </Suspense>
 
               <main className="min-h-0 flex-1 overflow-y-auto">
                 <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-8 md:py-8">

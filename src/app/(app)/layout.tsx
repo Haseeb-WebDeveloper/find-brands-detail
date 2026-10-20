@@ -3,6 +3,7 @@ import { Suspense, type ReactNode } from "react";
 import { getTeamScope, requireMember, scopeCan } from "@/lib/auth/scope";
 import { AppShell, type ShellNav } from "@/components/app/app-shell";
 import { allNavLeaves } from "@/components/app/nav";
+import { metaTokenStatus } from "@/lib/instagram/token";
 
 export const metadata: Metadata = { title: { default: "Batches", template: "%s · Brand Enrich" } };
 
@@ -14,6 +15,7 @@ async function loadNav(): Promise<ShellNav | null> {
     badges: {},
     email: scope.email,
     role: scope.role,
+    metaToken: metaTokenStatus(),
   };
 }
 
