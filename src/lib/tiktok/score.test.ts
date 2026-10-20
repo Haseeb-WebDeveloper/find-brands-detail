@@ -46,6 +46,14 @@ describe("scoreTiktok", () => {
     expect(scoreTiktok(cand("tirtir_official", { followers: 2 }), 900_000).score).toBe("rejected");
   });
 
+  it("rejects a tiny account found only by name, even when it is the only candidate", () => {
+    expect(scoreTiktok(cand("roundaround_official", { followers: 18 }), 18)).toEqual({
+      score: "rejected",
+      reason: "Only 18 followers, and nothing ties it to the brand.",
+    });
+    expect(scoreTiktok(cand("aestura", { followers: 472 }), 472).score).toBe("review");
+  });
+
   it("sends a name-only match or a blocked check to review", () => {
     expect(scoreTiktok(cand("benton"), 100_000).score).toBe("review");
     const blocked = scoreTiktok(cand("x", { lookup: { ok: false, reason: "blocked", message: "TikTok didn't show the profile, so it couldn't be checked." } }), 0);

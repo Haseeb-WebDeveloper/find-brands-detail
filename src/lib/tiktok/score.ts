@@ -12,6 +12,8 @@ export type TtVerdict = { score: "proven" | "review" | "rejected"; reason: strin
 
 /** Under this share of the biggest candidate's followers, an account is an impostor (spec §7). */
 const TINY_SHARE = 0.05;
+/** An account found only by name with fewer followers than this is a squatter, even alone (spec §7). */
+const SQUATTER_FOLLOWERS = 100;
 
 const host = (url: string) => {
   try {
@@ -51,6 +53,9 @@ export function scoreTiktok(c: TtCandidate, maxFollowers: number): TtVerdict {
   if (bioPage) return { score: "proven", reason: `Linked from the brand's Instagram bio page (${host(bioPage.url)}).` };
   if (c.bio.reached) return { score: "proven", reason: `Bio link reaches ${c.bio.reached}.` };
   if (c.sameBioAsInstagram) return { score: "proven", reason: "Bio link is the same page as the brand's Instagram bio." };
+  if (p.followers < SQUATTER_FOLLOWERS) {
+    return { score: "rejected", reason: `Only ${p.followers.toLocaleString("en-US")} followers, and nothing ties it to the brand.` };
+  }
   return { score: "review", reason: "Exists, but nothing ties it to the brand." };
 }
 

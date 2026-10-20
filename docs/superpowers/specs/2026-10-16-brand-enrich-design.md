@@ -47,7 +47,7 @@ db-admin, image hosting (image URLs are kept as found).
 | Campaign images | Brand-owned sources first (brand site, press pages, brand Instagram); any other source as a fallback, labelled third-party |
 | AI | Gemini with Google Search grounding for research; Groq or Gemini free tier for simple extraction. No Claude |
 | Instagram data | Meta Graph API Business Discovery through the existing Meta app ("Roofing"), plus the free crawler-page check for the verified badge |
-| TikTok data | Free link-preview check; Playwright on a GitHub Actions runner for badge and bio link |
+| TikTok data | Public profile page read directly (name, followers, badge, bio link); the brand Instagram bio page as a discovery source. A browser runner only if TikTok starts blocking (revised 2026-10-20) |
 | Hosting | Vercel (app), Supabase (database, Realtime), Inngest (jobs), GitHub Actions (browser runner) |
 | Images | URLs kept as found; checked at research time and again at export |
 | Live progress | Supabase Realtime **broadcast** on private channels; payloads carry ids only; the page re-renders from the server (revised 2026-10-20) |
