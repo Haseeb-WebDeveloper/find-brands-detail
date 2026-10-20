@@ -756,8 +756,8 @@ describe("parseSitesAnswer", () => {
   });
 
   it("drops retailers, marketplaces and social profiles", () => {
-    const text = '{"sites":[{"url":"https://www.sephora.com/brand/x","region":"us"},{"url":"https://www.amazon.com/stores/x","region":"us"},{"url":"https://instagram.com/x","region":"global"},{"url":"https://x.com","region":"global"}]}';
-    expect(parseSitesAnswer(text)).toEqual([{ url: "https://x.com", region: "global" }]);
+    const text = '{"sites":[{"url":"https://www.sephora.com/brand/x","region":"us"},{"url":"https://www.amazon.com/stores/x","region":"us"},{"url":"https://instagram.com/x","region":"global"},{"url":"https://acme-beauty.com","region":"global"}]}';
+    expect(parseSitesAnswer(text)).toEqual([{ url: "https://acme-beauty.com", region: "global" }]);
   });
 
   it("is empty for unreadable answers", () => {

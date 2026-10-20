@@ -21,11 +21,13 @@
     "inngest:dev": "pnpm dlx inngest-cli@latest dev -u http://localhost:3005/api/inngest"
   },
   "dependencies": {
+    "@ai-sdk/google": "^4.0.99",
     "@base-ui/react": "^1.6.0",
     "@prisma/adapter-pg": "7.4.2",
     "@prisma/client": "7.4.2",
     "@supabase/ssr": "^0.12.4",
     "@supabase/supabase-js": "^2.112.0",
+    "ai": "^7.0.143",
     "cheerio": "^1.2.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
