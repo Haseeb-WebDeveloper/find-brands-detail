@@ -102,8 +102,9 @@ checks performed, result, timestamp). Nothing is shown or exported without a sou
 
 - `users` — id (= `auth.users.id`), email, role (`owner` | `member`), created_at.
   Created on first sign-in for an invited email.
-- `invitations` — id, email, role, invited_by, token_hash, expires_at, accepted_at,
-  revoked_at, created_at. An invitation is what lets a new email create an account.
+- `invitations` — id, email, role, invited_by, expires_at, accepted_at, revoked_at,
+  created_at. A pending invitation is what lets a new email create an account; it is
+  claimed (user row created, invitation accepted) on that email's first sign-in.
 - `batches` — id, created_by, created_at, status.
 - `brands` — id, batch_id, name, website_hint, status
   (`queued` → `researching` → `needs_review` → `approved` → `exported`), current_step,
@@ -177,9 +178,10 @@ report. Exported brands get status `exported`.
 1. **Login** — email field; sends a magic link. A new email can create an account only
    when it has a pending invitation; the response is the same either way, so addresses
    can't be probed. Callback routes exchange the link for a session.
-2. **Team** (owners) — invite by email, resend, revoke, remove member, change role.
-   Invitees open `/invite/<token>`, sign in with the invited email, and accept; nothing
-   is accepted on a GET.
+2. **Team** (owners) — invite by email, revoke, remove member, change role. The
+   invitee signs in at `/login` with the invited email; the pending invitation lets the
+   account be created and is claimed on that first sign-in. Invitations expire after
+   7 days. The owner shares the login link; the app sends no invite email.
 3. **New batch** — paste box; Research button; live per-brand progress.
 4. **Batch view** — one row per brand, coloured cell per field (green proven, amber
    review, red missing), "needs you" count, filters.
