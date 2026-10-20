@@ -1,27 +1,17 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { Suspense } from "react";
 import { DesignPage } from "@/design/page";
 import { PageHeader } from "@/design/page-header";
 import { Button } from "@/design/button";
 import { Empty } from "@/design/empty";
-import { DataTable, type TableColumn } from "@/design/table";
-import { Pill } from "@/design/list";
-import { sayAgo } from "@/design/ago";
 import { requireMember, scopeCan } from "@/lib/auth/scope";
-import { listBatches, type BatchListItem } from "@/lib/batches/scoped";
+import { listBatches } from "@/lib/batches/scoped";
 import { RowsLoading } from "@/components/app/shell/page-skeletons";
+import { BatchTable } from "./batch-table";
 
 export const metadata: Metadata = { title: "Batches" };
 
-const COLUMNS: TableColumn<BatchListItem>[] = [
-  { key: "created", label: "Started", width: 180, cell: (b) => <Link href={`/batches/${b.id}`}>{sayAgo(b.createdAt)}</Link> },
-  { key: "by", label: "By", width: 220, grow: true, cell: (b) => b.createdBy ?? "—" },
-  { key: "brands", label: "Brands", width: 100, align: "end", cell: (b) => b.brandCount },
-  { key: "review", label: "Needs review", width: 140, align: "end", cell: (b) => (b.needsReview > 0 ? <Pill tone="orange">{b.needsReview}</Pill> : "—") },
-];
-
-async function BatchTable() {
+async function Batches() {
   const scope = await requireMember();
   const batches = await listBatches(scope);
   if (batches.length === 0) {
@@ -39,7 +29,7 @@ async function BatchTable() {
       />
     );
   }
-  return <DataTable label="Batches" rows={batches} rowKey={(b) => b.id} columns={COLUMNS} />;
+  return <BatchTable rows={batches} />;
 }
 
 async function Actions() {
@@ -63,7 +53,7 @@ export default function BatchesPage() {
         }
       />
       <Suspense fallback={<RowsLoading />}>
-        <BatchTable />
+        <Batches />
       </Suspense>
     </DesignPage>
   );

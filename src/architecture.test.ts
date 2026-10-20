@@ -48,6 +48,16 @@ describe("architecture", () => {
     expect(offenders).toEqual([]);
   });
 
+  it("uses DataTable only from client components", () => {
+    // DataTable takes functions (rowKey, cell renderers), which cannot cross from a Server
+    // Component — a server page that renders it crashes at runtime, not at build time.
+    const offenders = files
+      .filter((f) => !posix(f).startsWith("src/design/"))
+      .filter((f) => /from ["']@\/design\/table["']/.test(readFileSync(f, "utf8")))
+      .filter((f) => !readFileSync(f, "utf8").startsWith('"use client"'));
+    expect(offenders).toEqual([]);
+  });
+
   it("never reads app data from the browser", () => {
     const offenders = files
       .filter((f) => readFileSync(f, "utf8").includes('"use client"'))
