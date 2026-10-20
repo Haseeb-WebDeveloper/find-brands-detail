@@ -18,6 +18,11 @@ Design: `docs/superpowers/specs/2026-10-16-brand-enrich-design.md`. Rules: `AGEN
 7. Make sure `.env.local` has `INNGEST_DEV=1`, then `pnpm dev` and `pnpm inngest:dev` in a
    second terminal (Inngest's local dashboard: `http://localhost:8288`).
 8. Sign in at `http://localhost:3005/login` with the bootstrap email.
+9. **Instagram (Meta token, every 60 days):** in Graph API Explorer pick the app "Roofing", add the
+   permissions instagram_basic, instagram_manage_insights, pages_show_list, pages_read_engagement
+   and business_management, Generate Access Token (tick the Page and its Instagram account), paste
+   it into `.env.local` as `META_TEST_USER_TOKEN=`, then `pnpm meta:token`. The app shows a banner
+   in the token's last week. Restart `pnpm dev` afterwards.
 
 ## Deploy
 
@@ -30,4 +35,5 @@ Design: `docs/superpowers/specs/2026-10-16-brand-enrich-design.md`. Rules: `AGEN
 ## Commands
 
 `pnpm test` · `pnpm typecheck` · `pnpm lint` · `pnpm build` · schema changes: AGENTS.md rule 6 ·
-`pnpm db:migrate:deploy` · `pnpm verify:lockdown` · `pnpm verify:realtime` · `pnpm bootstrap <email>` · `pnpm inngest:dev`
+`pnpm db:migrate:deploy` · `pnpm verify:lockdown` · `pnpm verify:realtime` · `pnpm bootstrap <email>` · `pnpm inngest:dev` ·
+`pnpm meta:token` · `pnpm test-set` (live accuracy run)
