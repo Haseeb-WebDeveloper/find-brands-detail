@@ -48,30 +48,22 @@ export function LoginForm({
         initial={{ opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
         transition={motionPresets.move}
-        className="flex flex-col items-center gap-4 text-center"
+        className="flex flex-col items-center gap-3 text-center"
       >
-        <span className="grid size-16 place-items-center rounded-full bg-fill text-(--auth-muted)">
-          <Icon name="mail" className="size-7" />
-        </span>
-        <div className="flex flex-col gap-2">
-          <p className="text-title-3">Check your email</p>
-          <p className="text-body text-(--auth-muted)">
-            If <span className="font-medium text-label">{email}</span> is on the team, a link is on its
-            way. It works for an hour.
-          </p>
-        </div>
-        <p className="text-callout text-(--auth-muted)">Not invited yet? Then no email will come.</p>
-        <Button
-          kind="plain"
-          size="lg"
-          className={AUTH_BUTTON.outline}
+        <p className="text-title-3">Check your email</p>
+        <p className="text-body text-(--auth-muted)">
+          A sign-in link is on its way to <span className="font-medium text-label">{email}</span>.
+        </p>
+        <button
+          type="button"
+          className="mt-2 text-callout text-(--auth-muted) underline-offset-4 hover:text-label hover:underline"
           onClick={() => {
             setSent(false);
             setError(undefined);
           }}
         >
           Use a different address
-        </Button>
+        </button>
       </motion.div>
     );
   }
@@ -118,7 +110,7 @@ export function LoginForm({
       <div className="mt-2 flex flex-col gap-3">
         <Button type="submit" kind="filled" size="lg" disabled={off} className={AUTH_BUTTON.main}>
           {pending ? <Spinner /> : null}
-          Continue with email
+          Send sign-in link
         </Button>
       </div>
     </form>

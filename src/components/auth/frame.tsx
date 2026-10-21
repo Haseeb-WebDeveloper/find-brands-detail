@@ -1,7 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { cn } from "@/design/cn";
-import { Icon } from "@/design/icon";
 import { DesignRoot } from "@/design/root";
 import { DashboardTheme } from "@/components/app/theme";
 
@@ -61,12 +60,11 @@ export function AuthFrame({
       >
         <div className={cn("my-auto flex w-full flex-col", wide ? "max-w-xl" : "max-w-md")}>
           <header className="flex flex-col items-center gap-6 text-center">
-            <Link
-              href={homeHref}
-              aria-label="Brand Enrich"
-              className="grid size-10 place-items-center rounded-card bg-label text-page"
-            >
-              <Icon name="inbox" className="size-5" />
+            <Link href={homeHref} aria-label="Digital Beauty" className="flex">
+              {/* eslint-disable-next-line @next/next/no-img-element -- a fixed SVG. */}
+              <img src="/logo/digital-beauty-black.svg" alt="Digital Beauty" className="h-12 w-auto dark:hidden" />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/logo/digital-beauty-white.svg" alt="" className="hidden h-12 w-auto dark:block" />
             </Link>
             {title ? <AuthTitle title={title} subtitle={subtitle} /> : null}
           </header>

@@ -29,7 +29,6 @@ export default async function LoginPage({
           <AuthMessage tone="info">Sign-in isn&apos;t set up here. Set the Supabase URL and publishable key.</AuthMessage>
         ) : null
       }
-      footnote={<>Brand Enrich is invite-only.</>}
     >
       <LoginForm disabled={!configured} next={next ?? null} email={email} />
     </AuthFrame>
