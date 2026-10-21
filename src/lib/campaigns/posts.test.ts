@@ -28,4 +28,11 @@ describe("pageMentions", () => {
     expect(pageMentions("JUMISO launches a new cream.", "JUMISO x Jujutsu Kaisen Collaboration", "Jumiso")).toBe(false);
     expect(pageMentions("", "Anything", "Jumiso")).toBe(false);
   });
+
+  it("accepts a Korean article that names the campaign without the Latin brand name", () => {
+    const text = "넘버즈인, NCT WISH와 함께한 '화잘먹' 캠페인 공개";
+    expect(pageMentions(text, "NCT WISH ‘화잘먹’ Campaign", "numbuzin")).toBe(true);
+    // One shared word without the brand is a coincidence.
+    expect(pageMentions("Our wish list for winter", "NCT WISH ‘화잘먹’ Campaign", "numbuzin")).toBe(false);
+  });
 });

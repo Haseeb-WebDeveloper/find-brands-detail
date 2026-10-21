@@ -10,24 +10,34 @@ const STOP = new Set([
 ]);
 const MAX_POSTS = 2;
 
-/** The words of a campaign title that identify it: not the brand's name, not words every caption uses. */
+const HANGUL = /^[가-힯]+$/;
+
+/**
+ * The words of a campaign title that identify it: not the brand's name, not words every caption
+ * uses. Latin words of 4+ letters, acronyms in capitals ("NCT", "BTS") and Korean words of 2+
+ * syllables ("화잘먹").
+ */
 export function distinctiveWords(title: string, brand: string): string[] {
   const own = compactName(brand);
   return title
-    .toLowerCase()
-    .split(/[^a-z0-9à-ɏ]+/)
-    .filter((w) => w.length >= 4 && !STOP.has(w) && compactName(w) !== own);
+    .split(/[^A-Za-z0-9À-ɏ가-힯]+/)
+    .filter((w) => (HANGUL.test(w) ? w.length >= 2 : w.length >= 4 || /^[A-Z0-9]{2,3}$/.test(w)))
+    .map((w) => w.toLowerCase())
+    .filter((w) => !STOP.has(w) && compactName(w) !== own);
 }
 
 /**
- * Whether a source page is about the campaign: it names the brand and at least one distinctive word
- * of the title. Invented URLs often return 200 with a generic page (a newsroom index, an empty shell).
+ * Whether a source page is about the campaign. Invented URLs often return 200 with a generic page (a
+ * newsroom index, an empty shell), so loading proves nothing. The page must name the brand and one
+ * distinctive word of the title, or — a Korean article writes "넘버즈인", not "numbuzin" — two of them.
  */
 export function pageMentions(text: string, title: string, brand: string): boolean {
   const lower = text.toLowerCase();
-  if (!compactName(lower).includes(compactName(brand))) return false;
   const words = distinctiveWords(title, brand);
-  return words.length === 0 || words.some((w) => lower.includes(w));
+  const hits = words.filter((w) => lower.includes(w)).length;
+  const namesBrand = compactName(lower).includes(compactName(brand));
+  if (words.length === 0) return namesBrand;
+  return (namesBrand && hits >= 1) || hits >= 2;
 }
 
 /** Recent brand posts whose caption names the campaign: brand-owned imagery for it. */
