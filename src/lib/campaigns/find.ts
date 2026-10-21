@@ -9,7 +9,7 @@ const Answer = z.object({
 const SOCIAL = /(^|\.)(instagram|tiktok|facebook|youtube|youtu|x|twitter|threads|pinterest)\.[a-z.]+$/i;
 const MAX = 8;
 /** Spec §3: sales and promotions are not campaigns, whatever the model calls them. */
-const NOT_A_CAMPAIGN = /(promotions?|sales?|discounts?|giveaways?|coupons?|deals?)|% off/i;
+const NOT_A_CAMPAIGN = /\b(promotions?|sales?|discounts?|giveaways?|coupons?|deals?)\b|% off\b/i;
 
 export function campaignsPrompt({ brand, site, instagram }: { brand: string; site: string | null; instagram: string | null }): string {
   const about = [site ? `official site ${site}` : null, instagram ? `Instagram @${instagram}` : null].filter(Boolean).join(", ");
