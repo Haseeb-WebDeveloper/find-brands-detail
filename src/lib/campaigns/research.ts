@@ -5,7 +5,7 @@ import { chooseImage, scoreImage, type ImageCandidate, type ImageSource, type Im
 import { domainMatchesBrand, registrableDomain } from "@/lib/website/domain";
 import { campaignsPrompt, parseCampaignsAnswer } from "@/lib/campaigns/find";
 import { readCampaignPage } from "@/lib/campaigns/page";
-import { matchPosts } from "@/lib/campaigns/posts";
+import { matchPosts, pageMentions } from "@/lib/campaigns/posts";
 import { cutToSentence, DESCRIPTION_MAX, describePrompt, parseDescriptions, shortenPrompt } from "@/lib/campaigns/describe";
 import { noLog, type ResearchLog } from "@/lib/research/log-types";
 
@@ -51,14 +51,18 @@ export async function researchCampaigns(input: CampaignsInput, deps: CampaignsDe
   for (const c of found) {
     // Every source is fetched: the model sometimes names pages that don't exist.
     const pages: { url: string; images: string[]; text: string }[] = [];
+    let loaded = 0;
     for (const url of c.sources) {
       const p = await deps.fetchPage(url);
-      if (p.ok) pages.push({ url, ...readCampaignPage(p.html, p.finalUrl ?? url) });
+      if (!p.ok) continue;
+      loaded++;
+      const read = readCampaignPage(p.html, p.finalUrl ?? url);
+      if (pageMentions(read.text, c.title, input.brand)) pages.push({ url, ...read });
     }
     const posts = input.instagram ? matchPosts(c.title, input.brand, input.instagram.posts) : [];
     // Posts only add images: a caption match alone is too weak to prove a campaign exists.
     if (pages.length === 0) {
-      await log(`Dropped "${c.title}": none of its source pages loaded.`, "warn");
+      await log(`Dropped "${c.title}": ${loaded === 0 ? "none of its source pages loaded" : "its source pages don't mention it"}.`, "warn");
       continue;
     }
 

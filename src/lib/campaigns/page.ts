@@ -2,7 +2,8 @@ import * as cheerio from "cheerio";
 
 const SKIP = /\.(svg|gif)(\?|$)|^data:|logo|icon|avatar|sprite|placeholder|spacer|pixel|badge/i;
 const MAX_IMAGES = 4;
-const MAX_TEXT = 1_500;
+/** Enough to tell whether the page is about the campaign; the description prompt takes less. */
+const MAX_TEXT = 6_000;
 
 function absolute(href: string | undefined, base: string): string | null {
   if (!href) return null;

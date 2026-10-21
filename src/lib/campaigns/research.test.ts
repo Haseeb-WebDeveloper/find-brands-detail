@@ -6,9 +6,9 @@ import type { ImageCheckResult } from "@/lib/images/check-image";
 const page = (url: string, html: string, ok = true): FetchedPage => ({ requestedUrl: url, ok, status: ok ? 200 : 404, finalUrl: url, html, error: null, elapsedMs: 1 });
 
 const PAGES: Record<string, string> = {
-  "https://tirtir.global/blogs/press/v": `<title>V&YOU</title><meta property="og:image" content="https://tirtir.global/v.jpg"><article><p>TIRTIR named V its global ambassador.</p></article>`,
-  "https://tirtir.global/tour": `<title>The First Light</title><article><p>A moving pop-up world tour.</p></article>`,
-  "https://www.rollingstone.com/v": `<title>V x TIRTIR</title><meta property="og:image" content="https://rs.com/v.jpg"><p>V fronts TIRTIR.</p>`,
+  "https://tirtir.global/blogs/press/v": `<title>V&YOU</title><meta property="og:image" content="https://tirtir.global/v.jpg"><article><p>TIRTIR named V its global ambassador for Let's Radiate.</p></article>`,
+  "https://tirtir.global/tour": `<title>TIRTIR: The First Light</title><article><p>A moving pop-up world tour.</p></article>`,
+  "https://www.rollingstone.com/v": `<title>V x TIRTIR</title><meta property="og:image" content="https://rs.com/v.jpg"><p>V fronts TIRTIR's Radiate campaign.</p>`,
 };
 
 function deps() {

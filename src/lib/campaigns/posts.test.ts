@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { matchPosts } from "@/lib/campaigns/posts";
+import { matchPosts, pageMentions } from "@/lib/campaigns/posts";
 
 const posts = [
   { mediaType: "IMAGE", mediaUrl: "https://ig/1.jpg", caption: "Meet our new Red Cushion campaign ❤️ #TIRTIR" },
@@ -18,5 +18,14 @@ describe("matchPosts", () => {
     expect(matchPosts("Spring Renewal Campaign", "TIRTIR", [{ mediaType: "IMAGE", mediaUrl: "https://ig/5.jpg", caption: "Spring is here" }])).toEqual([]);
     // One shared word out of four is a coincidence.
     expect(matchPosts("World Tour; The First Light", "TIRTIR", [{ mediaType: "IMAGE", mediaUrl: "https://ig/6.jpg", caption: "First look at our toner" }])).toEqual([]);
+  });
+});
+
+describe("pageMentions", () => {
+  it("needs the brand's name and a distinctive word of the title", () => {
+    expect(pageMentions("TIRTIR named V its global ambassador for V&YOU: Let's Radiate.", "V&YOU: Let's Radiate", "TIRTIR")).toBe(true);
+    expect(pageMentions("보도자료 | 뉴스룸 | 무신사 0건의 소식이 있습니다.", "JUMISO x Jujutsu Kaisen Collaboration", "Jumiso")).toBe(false);
+    expect(pageMentions("JUMISO launches a new cream.", "JUMISO x Jujutsu Kaisen Collaboration", "Jumiso")).toBe(false);
+    expect(pageMentions("", "Anything", "Jumiso")).toBe(false);
   });
 });
