@@ -48,3 +48,16 @@ brands to export.
 
 Unit tests for the checklist builder, export grouping and the no-AI paths; typecheck, lint, build;
 a research run with the AI keys removed from the environment.
+
+## Revision 2 (same day, owner: "a bit extra big", "too much stuff", "review as fast as possible")
+
+Replaces §1 sizes and §2 Brand/Batch/Export above.
+- Desktop body 15px (callout 14, footnote 12); controls 36px, rows 44px.
+- Brand page: name, ‹ n of N ›, **Done → next** (marks reviewed, opens the next brand to review). One
+  card with five rows (chosen value, dot, "Change" opens alternatives and a typed value). Campaigns as
+  tiles with an in/out toggle; a tile opens an edit dialog. Brand details and Log folded. No hint
+  texts, no checklist panel.
+- Reviewed (`approved` status) is progress only, never a gate. Campaigns are in unless switched off.
+- Batch page: rows that open the brand, a dot per fact, "Start reviewing" and "Export".
+- Export never blocks: any finished brand, as it is; images that no longer load are left empty and
+  listed after the download.
