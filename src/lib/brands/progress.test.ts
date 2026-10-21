@@ -18,7 +18,7 @@ const base: BrandRow = {
 describe("progressText", () => {
   it("describes each status", () => {
     expect(progressText(base)).toBe("Waiting to start");
-    expect(progressText({ ...base, status: "researching", currentStep: "instagram" })).toBe("Checking Instagram (step 3 of 7)");
+    expect(progressText({ ...base, status: "researching", currentStep: "instagram" })).toBe("Checking Instagram (step 3 of 8)");
     expect(progressText({ ...base, status: "needs_review", reviewCount: 4 })).toBe("Ready for review · 4 need you");
     expect(progressText({ ...base, status: "needs_review" })).toBe("Ready for review");
     expect(progressText({ ...base, status: "needs_review", error: "Research stopped." })).toBe("Research stopped.");

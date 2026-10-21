@@ -39,6 +39,7 @@ export async function runInstagramStep(brandId: string, log: ResearchLog): Promi
           evidence: json({
             followers: p?.followers ?? null,
             name: p?.name ?? null,
+            biography: p?.biography ?? null,
             website: p?.website ?? null,
             verified: c.verified,
             bioReached: c.bio.reached,

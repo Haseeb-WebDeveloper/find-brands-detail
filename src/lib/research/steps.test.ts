@@ -5,12 +5,12 @@ import { brandResearchEvent } from "@/lib/inngest/events";
 
 describe("RESEARCH_STEPS", () => {
   it("follows the spec's order", () => {
-    expect(RESEARCH_STEPS.map((s) => s.id)).toEqual(["website", "crawl", "instagram", "tiktok", "images", "campaigns", "score"]);
+    expect(RESEARCH_STEPS.map((s) => s.id)).toEqual(["website", "crawl", "instagram", "tiktok", "images", "campaigns", "details", "score"]);
   });
 
   it("numbers steps from 1", () => {
     expect(stepNumber("website")).toBe(1);
-    expect(stepNumber("score")).toBe(7);
+    expect(stepNumber("score")).toBe(8);
     expect(stepNumber("nope")).toBe(0);
   });
 });

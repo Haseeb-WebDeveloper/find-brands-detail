@@ -9,6 +9,7 @@ import { runTiktokStep } from "@/lib/research/tiktok-step";
 import { runImagesStep } from "@/lib/research/images-step";
 import { runScoreStep } from "@/lib/research/score-step";
 import { runCampaignsStep } from "@/lib/research/campaigns-step";
+import { runDetailsStep } from "@/lib/research/details-step";
 
 /** The steps with real work so far; the rest are announced and skipped until their build lands. */
 const RUNNERS: Partial<Record<ResearchStepId, typeof runWebsiteStep>> = {
@@ -17,6 +18,7 @@ const RUNNERS: Partial<Record<ResearchStepId, typeof runWebsiteStep>> = {
   tiktok: runTiktokStep,
   images: runImagesStep,
   campaigns: runCampaignsStep,
+  details: runDetailsStep,
   score: runScoreStep,
 };
 
