@@ -10,6 +10,7 @@ import { useToast } from "@/design/toast";
 import { cn } from "@/design/cn";
 import type { CampaignCard } from "@/lib/brands/scoped";
 import { addCampaign, addCampaignImage, moveCampaign, saveCampaign, selectCampaignImage, setCampaignStatus } from "@/lib/review/actions";
+import { ANCHOR } from "@/components/app/review/anchor";
 
 /** The DB importer's limit; descriptions are asked for at 450 to leave room. */
 const MAX = 500;
@@ -76,8 +77,8 @@ function Card({ c, first, last, canEdit }: { c: CampaignCard; first: boolean; la
   const status = STATUS[c.status];
 
   return (
-    <article className={cn("flex gap-3 rounded-card bg-surface p-3", c.status === "removed" && "opacity-60")}>
-      <div className="w-28 shrink-0">
+    <article className={cn("flex flex-col gap-4 rounded-card bg-surface p-4 sm:flex-row", c.status === "removed" && "opacity-60")}>
+      <div className="w-40 shrink-0">
         {chosen ? (
           <a href={chosen.url} target="_blank" rel="noreferrer" title={chosen.reason}>
             {/* A remote image at its own address: the reviewer sees exactly what will be exported. */}
@@ -148,7 +149,7 @@ function Card({ c, first, last, canEdit }: { c: CampaignCard; first: boolean; la
                 className="rounded-md disabled:cursor-default"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={i.url} alt="" loading="lazy" referrerPolicy="no-referrer" className={cn("size-10 rounded-md bg-fill object-cover", i.score === "rejected" && "opacity-40")} />
+                <img src={i.url} alt="" loading="lazy" referrerPolicy="no-referrer" className={cn("size-14 rounded-md bg-fill object-cover", i.score === "rejected" && "opacity-40")} />
               </button>
             ))}
           </div>
@@ -267,20 +268,25 @@ export function CampaignEditor({ brandId, campaigns, canEdit }: { brandId: strin
   const proposed = campaigns.filter((c) => c.status === "proposed").length;
   const ordered = [...campaigns.filter((c) => c.status !== "removed"), ...campaigns.filter((c) => c.status === "removed")];
   return (
-    <section className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-headline text-label">Campaigns</h2>
-        <p className={cn("text-footnote", approved < 3 || approved > 8 ? "text-system-orange" : "text-label-secondary")}>
-          {approved} approved{proposed > 0 ? ` · ${proposed} to decide` : ""} — the DB takes 3 to 8 approved, in this order.
+    <section id="campaigns" className={cn("flex flex-col gap-3", ANCHOR)}>
+      <div className="flex flex-col gap-0.5">
+        <h2 className="text-title-3 text-label">Campaigns</h2>
+        <p className={cn("text-subhead", approved < 3 || approved > 8 ? "text-system-orange" : "text-label-secondary")}>
+          {approved} approved{proposed > 0 ? ` · ${proposed} to decide` : ""}. The DB takes 3 to 8 approved campaigns, in this order.
         </p>
       </div>
-      {ordered.length === 0 ? <p className="text-callout text-label-secondary">No campaigns found yet. Add them by hand.</p> : null}
-      <div className="grid gap-4 lg:grid-cols-2">
+      {ordered.length === 0 ? (
+        <div className="flex flex-col items-start gap-3 rounded-card bg-surface p-5">
+          <p className="text-callout text-label-secondary">No campaigns yet. Add the brand&apos;s campaigns by hand: a title, a description and an image address each.</p>
+          {canEdit ? <AddCampaign brandId={brandId} /> : null}
+        </div>
+      ) : null}
+      <div className="grid gap-4 2xl:grid-cols-2">
         {ordered.map((c, i) => (
           <Card key={c.id} c={c} first={i === 0} last={i === ordered.length - 1} canEdit={canEdit} />
         ))}
       </div>
-      {canEdit ? <AddCampaign brandId={brandId} /> : null}
+      {canEdit && ordered.length > 0 ? <AddCampaign brandId={brandId} /> : null}
     </section>
   );
 }

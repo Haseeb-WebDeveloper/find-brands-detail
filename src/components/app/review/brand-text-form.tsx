@@ -8,6 +8,7 @@ import { TextField } from "@/design/text-field";
 import { useToast } from "@/design/toast";
 import { cn } from "@/design/cn";
 import { saveBrandText } from "@/lib/review/actions";
+import { ANCHOR } from "@/components/app/review/anchor";
 
 type Text = { description: string; tier: string; aesthetic: string; industry: string; regions: string };
 const TIERS = [
@@ -26,10 +27,13 @@ export function BrandTextForm({ brandId, initial, canEdit }: { brandId: string; 
   const [pending, start] = useTransition();
   const set = (key: keyof Text) => (e: { currentTarget: { value: string } }) => setText({ ...text, [key]: e.currentTarget.value });
   return (
-    <section className="flex flex-col gap-3">
-      <h2 className="text-headline text-label">Brand details</h2>
+    <section id="details" className={cn("flex flex-col gap-3", ANCHOR)}>
+      <div className="flex flex-col gap-0.5">
+        <h2 className="text-title-3 text-label">Brand details</h2>
+        <p className="text-subhead text-label-secondary">The DB needs all five. Research doesn&apos;t fill these yet.</p>
+      </div>
       <form
-        className="flex flex-col gap-4 rounded-card bg-surface p-4"
+        className="flex flex-col gap-4 rounded-card bg-surface p-5"
         onSubmit={(e) => {
           e.preventDefault();
           start(async () => {

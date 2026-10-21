@@ -20,12 +20,25 @@ function useClock() {
  * What the research is doing, newest first, as it happens: the page re-reads it whenever a line is
  * written (`LiveRefresh`). `showBrand` for a batch, where lines from several brands interleave.
  */
-export function ResearchLog({ lines, showBrand = false, live = false }: { lines: LogLine[]; showBrand?: boolean; live?: boolean }) {
+export function ResearchLog({
+  lines,
+  showBrand = false,
+  live = false,
+  defaultOpen = true,
+}: {
+  lines: LogLine[];
+  showBrand?: boolean;
+  live?: boolean;
+  /** Folded once research has finished: the results are above, the log is the story of how. */
+  defaultOpen?: boolean;
+}) {
   const mounted = useClock();
   return (
-    <section className="flex flex-col gap-2">
-      <h2 className="flex items-center gap-2 text-title-3 text-label">
+    <details open={defaultOpen} className="group flex flex-col gap-2">
+      <summary className="flex cursor-pointer list-none items-center gap-2 text-title-3 text-label [&::-webkit-details-marker]:hidden">
+        <span aria-hidden className="text-label-secondary transition-transform group-open:rotate-90">›</span>
         Activity
+        <span className="text-subhead font-normal text-label-secondary">{lines.length} line{lines.length === 1 ? "" : "s"}</span>
         {live ? (
           <span className="flex items-center gap-1.5 text-footnote font-normal text-label-secondary">
             <span aria-hidden className="relative flex size-2">
@@ -35,8 +48,8 @@ export function ResearchLog({ lines, showBrand = false, live = false }: { lines:
             Live
           </span>
         ) : null}
-      </h2>
-      <div className="rounded-card bg-surface p-2">
+      </summary>
+      <div className="mt-2 rounded-card bg-surface p-2">
         {lines.length === 0 ? (
           <p className="px-2 py-3 text-callout text-label-secondary">Nothing yet. Lines appear here as the research runs.</p>
         ) : (
@@ -60,6 +73,6 @@ export function ResearchLog({ lines, showBrand = false, live = false }: { lines:
           </ol>
         )}
       </div>
-    </section>
+    </details>
   );
 }
