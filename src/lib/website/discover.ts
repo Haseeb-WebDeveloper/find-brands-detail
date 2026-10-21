@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { askWithSearch } from "@/lib/ai/models";
 import { noLog, type ResearchLog } from "@/lib/research/log-types";
 
 export type SiteSuggestion = { url: string; region: "global" | "us" | "kr" | "other" };
@@ -40,68 +41,8 @@ const PROMPT = (brand: string) =>
   `Exclude retailers, marketplaces, distributors and social media. ` +
   `Answer with JSON only: {"sites":[{"url":"https://...","region":"global|us|kr|other"}]}`;
 
-/**
- * Web-searching models, tried in order (contractor-sites' chain): Groq first, Gemini when Groq has
- * no key, errors or hits its quota. Search-grounded calls cannot also enforce a JSON schema, so the
- * prompt asks for JSON and `parseSitesAnswer` validates it.
- */
-const SEARCHERS: { label: string; ready: () => boolean; run: (brand: string) => Promise<string> }[] = [
-  {
-    label: "Groq",
-    ready: () => Boolean(process.env.GROQ_API_KEY),
-    run: async (brand) => {
-      const { generateText } = await import("ai");
-      const { groq } = await import("@ai-sdk/groq");
-      const ask = async () =>
-        (
-          await generateText({
-            model: groq("openai/gpt-oss-120b"),
-            tools: { browser_search: groq.tools.browserSearch({}) },
-            providerOptions: { groq: { reasoningEffort: "medium", reasoningFormat: "hidden" } },
-            abortSignal: AbortSignal.timeout(120_000),
-            prompt: PROMPT(brand),
-          })
-        ).text;
-      try {
-        return await ask();
-      } catch (error) {
-        // The model now and then calls a tool that doesn't exist ("json"), which Groq rejects
-        // outright. A second try almost always answers.
-        if (!/tool call validation failed/i.test(error instanceof Error ? error.message : String(error))) throw error;
-        return ask();
-      }
-    },
-  },
-  {
-    label: "Gemini",
-    ready: () => Boolean(process.env.GOOGLE_GENERATIVE_AI_API_KEY),
-    run: async (brand) => {
-      const { generateText } = await import("ai");
-      const { google } = await import("@ai-sdk/google");
-      const { text } = await generateText({
-        model: google("gemini-2.5-flash"),
-        tools: { google_search: google.tools.googleSearch({}) },
-        abortSignal: AbortSignal.timeout(120_000),
-        prompt: PROMPT(brand),
-      });
-      return text;
-    },
-  },
-];
-
 /** Never throws: no key or every model failing means no suggestions, and the brand goes to review. */
 export async function findOfficialSites(brand: string, log: ResearchLog = noLog): Promise<SiteSuggestion[]> {
-  for (const s of SEARCHERS.filter((x) => x.ready())) {
-    try {
-      await log(`Searching the web for ${brand}'s official sites with ${s.label}. This can take a minute…`);
-      const sites = parseSitesAnswer(await s.run(brand));
-      if (sites.length > 0) return sites;
-      await log(`${s.label} found no official site.`, "warn");
-    } catch (error) {
-      console.error(`[website] ${s.label} site search failed`, error);
-      const quota = /quota|rate.?limit|429/i.test(String(error instanceof Error ? error.message : error));
-      await log(`${s.label} search ${quota ? "is over its daily limit" : "failed"}.`, "warn");
-    }
-  }
-  return [];
+  const text = await askWithSearch(PROMPT(brand), { what: `${brand}'s official sites`, effort: "medium", log, accept: (t) => parseSitesAnswer(t).length > 0 });
+  return text ? parseSitesAnswer(text) : [];
 }
