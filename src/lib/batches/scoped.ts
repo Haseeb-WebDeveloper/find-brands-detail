@@ -32,6 +32,8 @@ export type BrandRow = {
   lastLog: string | null;
   /** The chosen value's score per field; null when nothing is chosen. */
   fields: Record<ReviewField, CandidateScore | null>;
+  /** The chosen value per field, with the follower count for the social accounts. */
+  chosen: Record<ReviewField, { value: string; score: CandidateScore; followers: number | null } | null>;
   campaigns: { approved: number; total: number };
 };
 
@@ -71,44 +73,48 @@ export async function getBatch(
   _scope: TeamScope,
   id: string,
 ): Promise<{ id: string; createdAt: string; brands: BrandRow[]; log: LogLine[] } | null> {
-  const batch = await prisma.batch.findUnique({
-    where: { id },
-    select: {
-      id: true,
-      createdAt: true,
-      brands: {
-        orderBy: { createdAt: "asc" },
-        select: {
-          id: true,
-          name: true,
-          status: true,
-          currentStep: true,
-          reviewCount: true,
-          error: true,
-          logs: { orderBy: { createdAt: "desc" }, take: 1, select: { message: true } },
-          selections: { select: { field: true, candidate: { select: { score: true } } } },
-          campaigns: { select: { status: true } },
-        },
-      },
-    },
-  });
+  // Separate queries, all at once: each round trip to the database is ~200ms (brands/scoped.ts).
+  const [batch, brands, selections, campaigns, log] = await Promise.all([
+    prisma.batch.findUnique({ where: { id }, select: { id: true, createdAt: true } }),
+    prisma.brand.findMany({
+      where: { batchId: id },
+      orderBy: { createdAt: "asc" },
+      select: { id: true, name: true, status: true, currentStep: true, reviewCount: true, error: true },
+    }),
+    prisma.selection.findMany({
+      where: { brand: { batchId: id } },
+      select: { brandId: true, field: true, typedValue: true, candidate: { select: { value: true, score: true, evidence: true } } },
+    }),
+    prisma.campaign.findMany({ where: { brand: { batchId: id } }, select: { brandId: true, status: true } }),
+    prisma.researchLog.findMany({
+      where: { batchId: id },
+      orderBy: { createdAt: "desc" },
+      take: BATCH_LOG_LINES,
+      select: { id: true, brandId: true, level: true, message: true, createdAt: true },
+    }),
+  ]);
   if (!batch) return null;
-  const names = new Map(batch.brands.map((b) => [b.id, b.name]));
-  const log = await prisma.researchLog.findMany({
-    where: { batchId: id },
-    orderBy: { createdAt: "desc" },
-    take: BATCH_LOG_LINES,
-    select: { id: true, brandId: true, level: true, message: true, createdAt: true },
-  });
+  const names = new Map(brands.map((b) => [b.id, b.name]));
   return {
     id: batch.id,
     createdAt: batch.createdAt.toISOString(),
-    brands: batch.brands.map(({ logs, selections, campaigns, ...b }) => ({
-      ...b,
-      lastLog: logs[0]?.message ?? null,
-      fields: Object.fromEntries(REVIEW_FIELDS.map((f) => [f, selections.find((x) => x.field === f)?.candidate?.score ?? null])) as Record<ReviewField, CandidateScore | null>,
-      campaigns: { approved: campaigns.filter((c) => c.status === "approved").length, total: campaigns.filter((c) => c.status !== "removed").length },
-    })),
+    brands: brands.map((b) => {
+      const mine = selections.filter((x) => x.brandId === b.id);
+      const camps = campaigns.filter((c) => c.brandId === b.id);
+      const chosen = (f: ReviewField) => {
+        const sel = mine.find((x) => x.field === f);
+        if (!sel?.candidate) return null;
+        const followers = (sel.candidate.evidence as { followers?: number | null } | null)?.followers;
+        return { value: sel.typedValue ?? sel.candidate.value, score: sel.candidate.score, followers: typeof followers === "number" ? followers : null };
+      };
+      return {
+        ...b,
+        lastLog: log.find((l) => l.brandId === b.id)?.message ?? null,
+        fields: Object.fromEntries(REVIEW_FIELDS.map((f) => [f, chosen(f)?.score ?? null])) as BrandRow["fields"],
+        chosen: Object.fromEntries(REVIEW_FIELDS.map((f) => [f, chosen(f)])) as BrandRow["chosen"],
+        campaigns: { approved: camps.filter((c) => c.status === "approved").length, total: camps.filter((c) => c.status !== "removed").length },
+      };
+    }),
     log: log.map((l) => ({
       id: l.id,
       brandId: l.brandId,

@@ -11,6 +11,7 @@ const base: BrandRow = {
   error: null,
   lastLog: null,
   fields: { website: null, instagram: null, tiktok: null, logo: null, cover: null },
+  chosen: { website: null, instagram: null, tiktok: null, logo: null, cover: null },
   campaigns: { approved: 0, total: 0 },
 };
 

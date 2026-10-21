@@ -48,20 +48,23 @@ export type BrandDetail = {
 
 const FIELDS = ["website", "instagram", "tiktok", "logo", "cover"] as const;
 
+/** The log lines a brand page carries; research writes a few dozen. */
+const LOG_LINES = 150;
+
 export async function getBrandDetail(_scope: TeamScope, id: string): Promise<BrandDetail | null> {
-  const brand = await prisma.brand.findUnique({
-    where: { id },
-    include: {
-      candidates: { where: { field: { in: [...FIELDS] } }, orderBy: { createdAt: "asc" } },
-      selections: { where: { field: { in: [...FIELDS] } } },
-      pages: { orderBy: { fetchedAt: "asc" } },
-      logs: { orderBy: { createdAt: "desc" } },
-      campaigns: { orderBy: { position: "asc" }, include: { images: true } },
-      text: true,
-    },
-  });
-  if (!brand) return null;
-  const siblings = await prisma.brand.findMany({ where: { batchId: brand.batchId }, orderBy: { createdAt: "asc" }, select: { id: true, name: true, status: true } });
+  // SEPARATE QUERIES, ALL AT ONCE. One `include` runs its relations one after another, and each round
+  // trip to the database is ~200ms from here (measured 2026-10-21): seven in a row was over a second.
+  const [base, candidates, selections, pages, logs, campaigns, siblings] = await Promise.all([
+    prisma.brand.findUnique({ where: { id }, include: { text: true } }),
+    prisma.candidate.findMany({ where: { brandId: id, field: { in: [...FIELDS] } }, orderBy: { createdAt: "asc" } }),
+    prisma.selection.findMany({ where: { brandId: id, field: { in: [...FIELDS] } } }),
+    prisma.brandPage.findMany({ where: { brandId: id }, orderBy: { fetchedAt: "asc" } }),
+    prisma.researchLog.findMany({ where: { brandId: id }, orderBy: { createdAt: "desc" }, take: LOG_LINES }),
+    prisma.campaign.findMany({ where: { brandId: id }, orderBy: { position: "asc" }, include: { images: true } }),
+    prisma.brand.findMany({ where: { batch: { brands: { some: { id } } } }, orderBy: { createdAt: "asc" }, select: { id: true, name: true, status: true } }),
+  ]);
+  if (!base) return null;
+  const brand = { ...base, candidates, selections, pages, logs, campaigns };
   const section = (field: (typeof FIELDS)[number]): FieldSection => ({
     selectedCandidateId: brand.selections.find((s) => s.field === field)?.candidateId ?? null,
     candidates: brand.candidates

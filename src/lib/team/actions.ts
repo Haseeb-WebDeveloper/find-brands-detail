@@ -1,7 +1,7 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
-import { getTeamScope, scopeCan } from "@/lib/auth/scope";
+import { revalidatePath, revalidateTag } from "next/cache";
+import { getTeamScope, memberTag, scopeCan } from "@/lib/auth/scope";
 import type { MemberRole } from "@/lib/auth/roles";
 import { removalProblem, roleChangeProblem } from "@/lib/team/rules";
 import { createInvitation, deleteMember, findMember, isMemberEmail, ownerCount, revokeInvitationById, setMemberRole } from "@/lib/team/store";
@@ -40,6 +40,7 @@ export async function removeMember(userId: string): Promise<Result> {
   const problem = removalProblem({ actorId: scope.userId, targetId: target.id, targetRole: target.role, ownerCount: await ownerCount() });
   if (problem) return { ok: false, error: problem };
   await deleteMember(scope, target.id);
+  revalidateTag(memberTag(target.id), { expire: 0 });
   revalidatePath("/team");
   return { ok: true };
 }
@@ -53,6 +54,7 @@ export async function changeMemberRole(userId: string, role: MemberRole): Promis
   const problem = roleChangeProblem({ actorId: scope.userId, targetId: target.id, from: target.role, to: role, ownerCount: await ownerCount() });
   if (problem) return { ok: false, error: problem };
   await setMemberRole(scope, target.id, role);
+  revalidateTag(memberTag(target.id), { expire: 0 });
   revalidatePath("/team");
   return { ok: true };
 }

@@ -35,9 +35,6 @@ function Account({ nav }: { nav: Promise<ShellNav | null> }) {
   if (!data) return <span className="size-(--ds-control-lg)" />;
   return (
     <div className="flex items-center gap-1">
-      <Button kind="plain" size="sm" href="/export" className="text-label">
-        Export
-      </Button>
       {data.canSeeTeam ? (
         <Button kind="plain" size="sm" href="/team" className="text-label">
           Team
@@ -58,22 +55,22 @@ export function AppShell({ nav, children }: { nav: Promise<ShellNav | null>; chi
   return (
     /**
      * THE PAGE SCROLLS, IN THE WINDOW (owner, 2026-10-21: "the scrollbar should show on the page
-     * itself"). No region scrolls on its own; the bar is sticky, and page headers stick below it
-     * (`--app-bar`).
+     * itself"). Nothing sticks: the bar and the page header scroll away with the page (owner, same day).
      */
     <DashboardTheme>
-      <DesignRoot data-surface="app" className="flex min-h-dvh flex-col bg-(--ds-ground) text-foreground [--app-bar:3.5rem]">
+      <DesignRoot data-surface="app" className="flex min-h-dvh flex-col bg-(--ds-ground) text-foreground">
         <div aria-hidden className="window-mesh pointer-events-none fixed inset-0" />
         <ToastProvider>
           <div className="relative z-10 flex flex-1 flex-col">
             <Suspense fallback={null}>
               <TokenBanner nav={nav} />
             </Suspense>
-            <div className="sticky top-0 z-30 bg-(--ds-ground)/80 backdrop-blur-xl">
-            <header className={`${COLUMN} flex h-(--app-bar) shrink-0 items-center gap-3`}>
-              <Link href="/" className="flex items-center gap-2 text-headline text-label">
-                <span aria-hidden className="size-6 rounded-lg bg-linear-to-br from-violet-500 to-sky-400" />
-                Brand Enrich
+            <header className={`${COLUMN} flex h-16 shrink-0 items-center gap-3`}>
+              <Link href="/" aria-label="Digital Beauty — batches" className="flex items-center">
+                {/* eslint-disable-next-line @next/next/no-img-element -- a fixed SVG, no resizing to do. */}
+                <img src="/logo/digital-beauty-black.svg" alt="Digital Beauty" className="h-10 w-auto dark:hidden" />
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/logo/digital-beauty-white.svg" alt="" className="hidden h-10 w-auto dark:block" />
               </Link>
               <div className="ml-auto">
                 <Suspense fallback={<span className="size-(--ds-control-lg)" />}>
@@ -81,7 +78,6 @@ export function AppShell({ nav, children }: { nav: Promise<ShellNav | null>; chi
                 </Suspense>
               </div>
             </header>
-            </div>
             <main className="flex-1">{children}</main>
           </div>
         </ToastProvider>

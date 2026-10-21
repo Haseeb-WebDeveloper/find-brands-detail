@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition } from "react";
+import { useEffect, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/design/button";
 import { useToast } from "@/design/toast";
@@ -21,17 +21,22 @@ export function ReviewBar({ brandId, batchId, siblings, status, canEdit }: { bra
   const after = nextToReview(siblings, brandId);
   const go = (to: Sibling | null) => router.push(to ? `/brands/${to.id}` : `/batches/${batchId}`);
   const reviewed = status === "approved" || status === "exported";
+  // Where Done goes, loaded ahead: the next brand opens at once (pages here wait ~200ms per database trip).
+  const afterId = after?.id;
+  useEffect(() => {
+    if (afterId) router.prefetch(`/brands/${afterId}`);
+  }, [afterId, router]);
 
   return (
     <div className="flex items-center gap-2">
       <div className="flex items-center">
-        <Button kind="plain" size="sm" iconOnly icon="chevronLeft" disabled={!prev} href={prev ? `/brands/${prev.id}` : undefined} className="border-none text-label">
+        <Button kind="plain" size="sm" iconOnly icon="chevronLeft" disabled={!prev} href={prev ? `/brands/${prev.id}` : undefined} prefetch className="border-none text-label">
           Previous brand
         </Button>
         <span className="min-w-14 text-center text-subhead text-label-secondary tabular-nums">
           {at + 1} of {siblings.length}
         </span>
-        <Button kind="plain" size="sm" iconOnly icon="chevronRight" disabled={!next} href={next ? `/brands/${next.id}` : undefined} className="border-none text-label">
+        <Button kind="plain" size="sm" iconOnly icon="chevronRight" disabled={!next} href={next ? `/brands/${next.id}` : undefined} prefetch className="border-none text-label">
           Next brand
         </Button>
       </div>

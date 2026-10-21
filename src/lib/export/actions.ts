@@ -43,7 +43,6 @@ export async function exportBrands(brandIds: string[]): Promise<ExportResult> {
   }
 
   await markExported(scope, ids);
-  revalidatePath("/export");
   revalidatePath("/");
   return { ok: true, csv: toCsv(IMPORT_HEADERS, rows), filename: `brand-enrich-${new Date().toISOString().slice(0, 10)}.csv`, count: rows.length, notes };
 }

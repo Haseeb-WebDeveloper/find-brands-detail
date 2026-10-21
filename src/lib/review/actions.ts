@@ -40,7 +40,6 @@ const MISSING = { ok: false, error: "That doesn't exist any more. Reload the pag
 function refresh(written: NonNullable<Written>) {
   revalidatePath(`/brands/${written.brandId}`);
   revalidatePath(`/batches/${written.batchId}`);
-  revalidatePath("/export");
 }
 
 const deps = (brand: string): TypedDeps => ({ brand, fetchPage, judgeSite, lookupBusiness, lookupProfile, checkImage: checkImageUrl });
