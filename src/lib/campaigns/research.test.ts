@@ -63,6 +63,15 @@ describe("researchCampaigns", () => {
     expect(v?.descriptionNote).toBe("Shortened to fit 500 characters; check the ending.");
   });
 
+  it("asks again for a description the model skipped", async () => {
+    const d = deps();
+    d.write.mockResolvedValueOnce(JSON.stringify({ descriptions: ["V fronts TIRTIR's first global campaign.", ""] }));
+    d.write.mockResolvedValueOnce(JSON.stringify({ descriptions: ["A pop-up world tour."] }));
+    const r = await researchCampaigns(input, d, undefined, NOW);
+    expect(r.find((c) => c.title.startsWith("World"))?.description).toBe("A pop-up world tour.");
+    expect(d.write).toHaveBeenCalledTimes(2);
+  });
+
   it("returns nothing when the search finds nothing", async () => {
     const d = deps();
     d.search.mockResolvedValueOnce(null);

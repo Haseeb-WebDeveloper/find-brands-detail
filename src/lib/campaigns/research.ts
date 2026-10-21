@@ -94,6 +94,12 @@ export async function researchCampaigns(input: CampaignsInput, deps: CampaignsDe
 
   await log("Writing the campaign descriptions…");
   const written = parseDescriptions((await deps.write(describePrompt(input.brand, kept))) ?? "", kept.length);
+  // The model sometimes skips one: ask once more for just those.
+  const missing = kept.map((c, i) => ({ c, i })).filter(({ i }) => !written[i]);
+  if (missing.length > 0) {
+    const again = parseDescriptions((await deps.write(describePrompt(input.brand, missing.map(({ c }) => c)))) ?? "", missing.length);
+    missing.forEach(({ i }, n) => (written[i] = again[n]));
+  }
   const out: ResearchedCampaign[] = [];
   for (const [i, { text: _text, ...c }] of kept.entries()) {
     let description = written[i] ?? "";

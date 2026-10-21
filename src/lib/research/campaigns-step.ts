@@ -4,6 +4,7 @@ import { askPlain, askWithSearch } from "@/lib/ai/models";
 import { checkImageUrl } from "@/lib/images/check-image";
 import { fetchPage } from "@/lib/website/fetch-page";
 import { researchCampaigns } from "@/lib/campaigns/research";
+import { parseCampaignsAnswer } from "@/lib/campaigns/find";
 import { loadResearchPages } from "@/lib/research/pages";
 import type { ResearchLog } from "@/lib/research/log-types";
 
@@ -31,7 +32,7 @@ export async function runCampaignsStep(brandId: string, log: ResearchLog): Promi
   const campaigns = await researchCampaigns(
     input,
     {
-      search: (prompt, l) => askWithSearch(prompt, { what: `${name}'s campaigns`, effort: "low", log: l }),
+      search: (prompt, l) => askWithSearch(prompt, { what: `${name}'s campaigns`, effort: "low", log: l, accept: (t) => parseCampaignsAnswer(t).length > 0 }),
       write: askPlain,
       fetchPage,
       checkImage: (url) => checkImageUrl(url, "campaign"),
