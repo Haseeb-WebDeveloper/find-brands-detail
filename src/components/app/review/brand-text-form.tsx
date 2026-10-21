@@ -8,7 +8,6 @@ import { TextField } from "@/design/text-field";
 import { useToast } from "@/design/toast";
 import { cn } from "@/design/cn";
 import { saveBrandText } from "@/lib/review/actions";
-import { ANCHOR } from "@/components/app/review/anchor";
 
 type Text = { description: string; tier: string; aesthetic: string; industry: string; regions: string };
 const TIERS = [
@@ -25,15 +24,17 @@ export function BrandTextForm({ brandId, initial, canEdit }: { brandId: string; 
   const toast = useToast();
   const [text, setText] = useState<Text>({ ...initial, aesthetic: shown(initial.aesthetic), industry: shown(initial.industry), regions: shown(initial.regions) });
   const [pending, start] = useTransition();
+  const filled = [initial.description, initial.tier, initial.aesthetic, initial.industry, initial.regions].filter((v) => v.trim()).length;
   const set = (key: keyof Text) => (e: { currentTarget: { value: string } }) => setText({ ...text, [key]: e.currentTarget.value });
   return (
-    <section id="details" className={cn("flex flex-col gap-3", ANCHOR)}>
-      <div className="flex flex-col gap-0.5">
-        <h2 className="text-title-3 text-label">Brand details</h2>
-        <p className="text-subhead text-label-secondary">The DB needs all five. Research doesn&apos;t fill these yet.</p>
-      </div>
+    <details className="group rounded-card bg-surface">
+      <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 [&::-webkit-details-marker]:hidden">
+        <span aria-hidden className="text-label-secondary transition-transform group-open:rotate-90">›</span>
+        <span className="text-headline text-label">Brand details</span>
+        <span className="text-subhead text-label-secondary">{filled} of 5 filled</span>
+      </summary>
       <form
-        className="flex flex-col gap-4 rounded-card bg-surface p-5"
+        className="flex flex-col gap-4 border-t border-separator p-4"
         onSubmit={(e) => {
           e.preventDefault();
           start(async () => {
@@ -51,7 +52,7 @@ export function BrandTextForm({ brandId, initial, canEdit }: { brandId: string; 
             onChange={set("description")}
             disabled={!canEdit}
             rows={4}
-            placeholder="What the brand is and what it stands for, as the DB shows it."
+            placeholder=""
             className={cn(
               "w-full rounded-field border border-transparent bg-fill px-3 py-2 text-body text-label placeholder:text-label-secondary",
               "focus:border-tint focus:bg-surface focus-visible:outline-none",
@@ -72,7 +73,6 @@ export function BrandTextForm({ brandId, initial, canEdit }: { brandId: string; 
           <TextField label="Industry" placeholder="skincare" value={text.industry} onChange={set("industry")} disabled={!canEdit} />
           <TextField label="Regions" placeholder="Asia, North America" value={text.regions} onChange={set("regions")} disabled={!canEdit} />
         </div>
-        <p className="text-footnote text-label-secondary">Separate several with commas.</p>
         {canEdit ? (
           <div>
             <Button kind="filled" type="submit" disabled={pending}>
@@ -81,6 +81,6 @@ export function BrandTextForm({ brandId, initial, canEdit }: { brandId: string; 
           </div>
         ) : null}
       </form>
-    </section>
+    </details>
   );
 }

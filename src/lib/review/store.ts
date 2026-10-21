@@ -9,11 +9,6 @@ import { REQUIRED_FIELDS, reviewSummary, type RequiredField } from "@/lib/resear
 type Tx = Prisma.TransactionClient;
 const json = (value: unknown) => value as Prisma.InputJsonValue;
 
-/** Any edit re-opens an approved or exported brand: approval is for the state the reviewer saw. */
-async function reopen(tx: Tx, brandId: string) {
-  await tx.brand.updateMany({ where: { id: brandId, status: { in: ["approved", "exported"] } }, data: { status: "needs_review" } });
-}
-
 /** Keeps the batch table's "needs you" count right after a reviewer's choice. */
 async function recount(tx: Tx, brandId: string) {
   const selections = await tx.selection.findMany({ where: { brandId }, include: { candidate: { select: { score: true } } } });
@@ -29,7 +24,6 @@ async function select(tx: Tx, brandId: string, field: ReviewField, candidateId: 
     create: { brandId, field, candidateId, chosenBy: "reviewer" },
     update: { candidateId, typedValue: null, chosenBy: "reviewer" },
   });
-  await reopen(tx, brandId);
   await recount(tx, brandId);
 }
 
@@ -75,7 +69,6 @@ export async function saveBrandText(_scope: TeamScope, brandId: string, text: Br
     const found = await owner(tx, brandId);
     if (!found) return null;
     await tx.brandText.upsert({ where: { brandId }, create: { brandId, ...text }, update: text });
-    await reopen(tx, brandId);
     return found;
   });
 }
@@ -101,7 +94,6 @@ export async function updateCampaign(_scope: TeamScope, campaignId: string, data
     const c = await campaignOwner(tx, campaignId);
     if (!c) return null;
     await tx.campaign.update({ where: { id: campaignId }, data: { title: data.title.trim(), description: data.description.trim() } });
-    await reopen(tx, c.brandId);
     return { brandId: c.brandId, batchId: c.batchId };
   });
 }
@@ -111,7 +103,6 @@ export async function setCampaignStatus(_scope: TeamScope, campaignId: string, s
     const c = await campaignOwner(tx, campaignId);
     if (!c) return null;
     await tx.campaign.update({ where: { id: campaignId }, data: { status } });
-    await reopen(tx, c.brandId);
     return { brandId: c.brandId, batchId: c.batchId };
   });
 }
@@ -129,7 +120,6 @@ export async function moveCampaign(_scope: TeamScope, campaignId: string, by: -1
     if (neighbour) {
       await tx.campaign.update({ where: { id: neighbour.id }, data: { position: c.position } });
       await tx.campaign.update({ where: { id: campaignId }, data: { position: neighbour.position } });
-      await reopen(tx, c.brandId);
     }
     return { brandId: c.brandId, batchId: c.batchId };
   });
@@ -142,7 +132,6 @@ export async function selectCampaignImage(_scope: TeamScope, campaignId: string,
     if (!c || !image) return null;
     await tx.campaignImage.updateMany({ where: { campaignId }, data: { selected: false } });
     await tx.campaignImage.update({ where: { id: imageId }, data: { selected: true } });
-    await reopen(tx, c.brandId);
     return { brandId: c.brandId, batchId: c.batchId };
   });
 }
@@ -156,7 +145,6 @@ export async function addCampaignImage(_scope: TeamScope, campaignId: string, im
     if (!c) return null;
     await tx.campaignImage.updateMany({ where: { campaignId }, data: { selected: false } });
     await tx.campaignImage.create({ data: { campaignId, ...image, selected: true } });
-    await reopen(tx, c.brandId);
     return { brandId: c.brandId, batchId: c.batchId };
   });
 }
@@ -182,7 +170,6 @@ export async function addCampaign(
         images: data.image ? { create: [{ ...data.image, selected: true }] } : undefined,
       },
     });
-    await reopen(tx, brandId);
     return found;
   });
 }

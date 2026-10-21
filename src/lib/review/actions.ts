@@ -6,7 +6,6 @@ import { REVIEW_FIELDS, toList, type ReviewField } from "@/lib/export/row";
 import { TIER_OPTIONS } from "@/lib/export/importer/brand-create";
 import { checkTyped, type TypedDeps } from "@/lib/review/check-typed";
 import { validateCampaignInput } from "@/lib/review/campaign-input";
-import { approvalBlockers } from "@/lib/review/blockers";
 import { getReviewState } from "@/lib/review/scoped";
 import {
   addCampaign as storeAddCampaign,
@@ -104,15 +103,11 @@ export async function saveBrandText(brandId: string, text: { description: string
   return { ok: true };
 }
 
-/** Spec §8: enabled only when the DB importer would take the brand and nothing chosen is red. */
-export async function approveBrand(brandId: string): Promise<Result> {
+/** "Done": the reviewer has looked at the brand. Progress only; nothing is required (owner, 2026-10-21). */
+export async function markReviewed(brandId: string): Promise<Result> {
   const scope = await getTeamScope();
   if (!scope || !scopeCan(scope, "batches:write")) return DENIED;
   if (!UUID.test(brandId)) return MISSING;
-  const state = await getReviewState(scope, brandId);
-  if (!state) return MISSING;
-  const { errors } = approvalBlockers(state);
-  if (errors.length > 0) return { ok: false, error: `Not yet: ${errors[0]}` };
   const written = await setBrandStatus(scope, brandId, "approved");
   if (!written) return MISSING;
   refresh(written);

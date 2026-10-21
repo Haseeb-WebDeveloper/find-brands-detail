@@ -2,84 +2,35 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { DataTable, type TableColumn } from "@/design/table";
 import { Segmented } from "@/design/segmented";
-import { Pill } from "@/design/list";
-import { Button } from "@/design/button";
 import { cn } from "@/design/cn";
 import type { BrandRow } from "@/lib/batches/scoped";
-import { progressText, progressTone } from "@/lib/brands/progress";
-import type { ReviewField } from "@/lib/export/row";
+import { REVIEW_FIELDS, type ReviewField } from "@/lib/export/row";
 
-type Filter = "all" | "needs" | "approved";
+type Filter = "all" | "todo" | "done";
 
-const DOT = { proven: "bg-system-green", review: "bg-system-orange", rejected: "bg-system-red", missing: "bg-system-red" } as const;
-const WORD = { proven: "Proven", review: "Needs a look", rejected: "Rejected", missing: "Missing" } as const;
+const DOT = { proven: "bg-system-green", review: "bg-system-orange", rejected: "bg-system-red" } as const;
+const SHORT: Record<ReviewField, string> = { website: "Site", instagram: "IG", tiktok: "TT", logo: "Logo", cover: "Cover" };
+const WORD = { proven: "proven", review: "needs a look", rejected: "rejected" } as const;
 
-function Cell({ score }: { score: BrandRow["fields"][ReviewField] }) {
-  const key = score ?? "missing";
-  return (
-    <span className="flex items-center gap-1.5" title={WORD[key]}>
-      <span aria-hidden className={cn("size-2.5 rounded-full", DOT[key])} />
-      <span className="text-subhead text-label-secondary">{WORD[key]}</span>
-    </span>
-  );
+const done = (b: BrandRow) => b.status === "approved" || b.status === "exported";
+const waiting = (b: BrandRow) => b.status === "queued" || b.status === "researching";
+
+function Status({ b }: { b: BrandRow }) {
+  if (b.error) return <span className="text-subhead text-system-red">Stopped</span>;
+  if (waiting(b)) return <span className="text-subhead text-label-tertiary">{b.status === "queued" ? "Waiting" : "Researching"}</span>;
+  if (b.status === "exported") return <span className="text-subhead text-label-secondary">Exported</span>;
+  if (done(b)) return <span className="text-subhead text-system-green">✓ Reviewed</span>;
+  return <span className="text-subhead text-tint-text">Review →</span>;
 }
 
-const field = (key: ReviewField, label: string): TableColumn<BrandRow> => ({
-  key,
-  label,
-  width: 132,
-  cell: (b) => (b.status === "queued" || b.status === "researching" ? <span className="text-footnote text-label-tertiary">—</span> : <Cell score={b.fields[key]} />),
-});
-
-const COLUMNS: TableColumn<BrandRow>[] = [
-  {
-    key: "name",
-    label: "Brand",
-    width: 200,
-    grow: true,
-    cell: (b) => (
-      <Link href={`/brands/${b.id}`} className="font-medium text-label underline-offset-4 hover:underline">
-        {b.name}
-      </Link>
-    ),
-  },
-  field("website", "Website"),
-  field("instagram", "Instagram"),
-  field("tiktok", "TikTok"),
-  field("logo", "Logo"),
-  field("cover", "Cover"),
-  {
-    key: "campaigns",
-    label: "Campaigns",
-    width: 120,
-    cell: (b) => (
-      <span className={cn("text-subhead tabular-nums", b.campaigns.approved < 3 ? "text-system-orange" : "text-label-secondary")}>
-        {b.campaigns.approved}/{b.campaigns.total} approved
-      </span>
-    ),
-  },
-  { key: "status", label: "Status", width: 240, cell: (b) => <Pill tone={progressTone(b)}>{progressText(b)}</Pill> },
-  {
-    key: "open",
-    label: "",
-    width: 110,
-    align: "end",
-    cell: (b) => (
-      <Button kind={b.status === "needs_review" ? "filled" : "gray"} size="sm" href={`/brands/${b.id}`}>
-        {b.status === "needs_review" ? "Review" : "Open"}
-      </Button>
-    ),
-  },
-];
-
-/** Spec §8 screen 4: one row per brand, a coloured cell per field, filters for what needs a person. */
+/** The batch at a glance: a dot per fact (green, orange, red, empty) and where each brand is. A row opens the brand. */
 export function BatchTable({ brands }: { brands: BrandRow[] }) {
   const [filter, setFilter] = useState<Filter>("all");
-  const needs = brands.filter((b) => b.status === "needs_review");
-  const approved = brands.filter((b) => b.status === "approved" || b.status === "exported");
-  const rows = filter === "needs" ? needs : filter === "approved" ? approved : brands;
+  const todo = brands.filter((b) => !done(b) && !waiting(b));
+  const reviewed = brands.filter(done);
+  const rows = filter === "todo" ? todo : filter === "done" ? reviewed : brands;
+  const grid = "grid grid-cols-[minmax(8rem,1fr)_repeat(5,3.25rem)_4.5rem_7rem] items-center gap-x-2";
   return (
     <section className="flex flex-col gap-3">
       <Segmented
@@ -88,15 +39,44 @@ export function BatchTable({ brands }: { brands: BrandRow[] }) {
         onValueChange={setFilter}
         options={[
           { value: "all", label: "All", count: brands.length },
-          { value: "needs", label: "Needs you", count: needs.length },
-          { value: "approved", label: "Approved", count: approved.length },
+          { value: "todo", label: "To review", count: todo.length },
+          { value: "done", label: "Reviewed", count: reviewed.length },
         ]}
       />
-      {rows.length === 0 ? (
-        <p className="text-callout text-label-secondary">{filter === "needs" ? "Nothing needs you right now." : "No approved brands yet."}</p>
-      ) : (
-        <DataTable label="Brands" rows={rows} rowKey={(b) => b.id} columns={COLUMNS} />
-      )}
+      <div className="overflow-x-auto rounded-card bg-surface">
+        <div className="min-w-[38rem]">
+          <div className={cn(grid, "border-b border-separator px-4 py-2 text-footnote text-label-secondary")}>
+            <span>Brand</span>
+            {REVIEW_FIELDS.map((f) => (
+              <span key={f} className="text-center">
+                {SHORT[f]}
+              </span>
+            ))}
+            <span className="text-center">Camp.</span>
+            <span />
+          </div>
+          {rows.map((b) => (
+            <Link key={b.id} href={`/brands/${b.id}`} className={cn(grid, "border-b border-separator px-4 py-3 transition-colors last:border-b-0 hover:bg-fill/50")}>
+              <span className="truncate text-body text-label">{b.name}</span>
+              {REVIEW_FIELDS.map((f) => {
+                const s = b.fields[f];
+                return (
+                  <span key={f} className="flex justify-center" title={`${f}: ${s ? WORD[s] : "empty"}`}>
+                    <span className={cn("size-2.5 rounded-full", waiting(b) ? "bg-fill" : s ? DOT[s] : "border border-label-tertiary")} />
+                  </span>
+                );
+              })}
+              <span className={cn("text-center text-subhead tabular-nums", b.campaigns.total < 3 ? "text-system-orange" : "text-label-secondary")}>
+                {waiting(b) ? "" : b.campaigns.total}
+              </span>
+              <span className="text-right">
+                <Status b={b} />
+              </span>
+            </Link>
+          ))}
+          {rows.length === 0 ? <p className="px-4 py-6 text-center text-callout text-label-secondary">Nothing here.</p> : null}
+        </div>
+      </div>
     </section>
   );
 }

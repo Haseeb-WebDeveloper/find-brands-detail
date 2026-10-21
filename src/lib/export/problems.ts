@@ -10,11 +10,13 @@ export function imageCells(row: RawImportRow): { column: string; url: string; sl
 }
 
 const NAME = (column: string) =>
-  column === "logo_url" ? "Logo" : column === "cover_image_url" ? "Cover" : `Campaign ${column.match(/^campaign_(\d+)_/)?.[1] ?? ""} image`;
+  column === "logo_url" ? "logo" : column === "cover_image_url" ? "cover" : `campaign ${column.match(/^campaign_(\d+)_/)?.[1] ?? ""} image`;
 
-/** Spec §12: images are re-checked at export; one that no longer passes blocks the brand. */
-export function imageProblem(column: string, check: ImageCheckResult): string | null {
+/**
+ * Images are loaded again at export (Instagram links expire within days). One that no longer passes
+ * is left empty rather than blocking the export; the note says which.
+ */
+export function imageNote(brand: string, column: string, check: ImageCheckResult): string | null {
   if (check.ok && check.passesMin) return null;
-  const why = check.reason ?? (check.ok ? "too small" : "doesn't load");
-  return `${NAME(column)}: the image no longer passes the DB's check (${why}). Pick another on the brand page.`;
+  return `${brand}: ${NAME(column)} ${check.ok ? "is too small" : "didn't load"}, left empty`;
 }

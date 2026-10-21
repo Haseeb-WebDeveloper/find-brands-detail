@@ -35,10 +35,9 @@ export function ResearchLog({
   const mounted = useClock();
   return (
     <details open={defaultOpen} className="group flex flex-col gap-2">
-      <summary className="flex cursor-pointer list-none items-center gap-2 text-title-3 text-label [&::-webkit-details-marker]:hidden">
+      <summary className="flex cursor-pointer list-none items-center gap-2 text-headline text-label [&::-webkit-details-marker]:hidden">
         <span aria-hidden className="text-label-secondary transition-transform group-open:rotate-90">›</span>
-        Activity
-        <span className="text-subhead font-normal text-label-secondary">{lines.length} line{lines.length === 1 ? "" : "s"}</span>
+        Log
         {live ? (
           <span className="flex items-center gap-1.5 text-footnote font-normal text-label-secondary">
             <span aria-hidden className="relative flex size-2">

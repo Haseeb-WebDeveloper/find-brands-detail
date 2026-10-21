@@ -42,6 +42,8 @@ export type BrandDetail = {
   /** The reviewer's brand text (spec §6 brand_text); empty strings until typed. */
   text: { description: string; tier: string; aesthetic: string; industry: string; regions: string };
   log: LogLine[];
+  /** The batch's brands in order, for the pager and "Done → next". */
+  siblings: { id: string; name: string; status: BrandStatus }[];
 };
 
 const FIELDS = ["website", "instagram", "tiktok", "logo", "cover"] as const;
@@ -59,6 +61,7 @@ export async function getBrandDetail(_scope: TeamScope, id: string): Promise<Bra
     },
   });
   if (!brand) return null;
+  const siblings = await prisma.brand.findMany({ where: { batchId: brand.batchId }, orderBy: { createdAt: "asc" }, select: { id: true, name: true, status: true } });
   const section = (field: (typeof FIELDS)[number]): FieldSection => ({
     selectedCandidateId: brand.selections.find((s) => s.field === field)?.candidateId ?? null,
     candidates: brand.candidates
@@ -107,6 +110,7 @@ export async function getBrandDetail(_scope: TeamScope, id: string): Promise<Bra
       industry: brand.text?.industry ?? "",
       regions: brand.text?.regions ?? "",
     },
+    siblings,
     log: brand.logs.map((l) => ({ id: l.id, brandId: l.brandId, brandName: brand.name, level: l.level as LogLevel, message: l.message, at: l.createdAt.toISOString() })),
   };
 }

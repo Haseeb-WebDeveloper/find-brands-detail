@@ -192,10 +192,10 @@
 
     /* Control heights. These follow the POINTER, not the screen: a finger needs 44px wherever it
        is, a mouse does not, and a laptop with a touchscreen gets the finger's sizes. */
-    --ds-control-sm: 2rem;
-    --ds-control-md: 2.5rem;
-    --ds-control-lg: 2.75rem;
-    --ds-row: 3rem;
+    --ds-control-sm: 1.875rem;
+    --ds-control-md: 2.25rem;
+    --ds-control-lg: 2.5rem;
+    --ds-row: 2.75rem;
 
     color-scheme: light;
     background-color: var(--ds-canvas);
@@ -210,30 +210,30 @@
     -webkit-tap-highlight-color: transparent;
   }
 
-  /* Type, the desktop scale: body 16px. Brand Enrich is read closely (evidence, descriptions), so it
-     sits a step above contractor-sites' 14px (owner, 2026-10-21: "text and sizes a bit small"). */
+  /* Type, the desktop scale: body 15px, between contractor-sites' 14px and the 16px tried on 2026-10-21
+     (owner: 14 "a bit small", then 16 "a bit extra big"). */
   @media (min-width: 768px) {
     [data-design] {
-      --ds-t-large-title: 1.75rem;
-      --ds-l-large-title: 2.125rem;
-      --ds-t-title-1: 1.5rem;
-      --ds-l-title-1: 1.875rem;
-      --ds-t-title-2: 1.25rem;
-      --ds-l-title-2: 1.625rem;
-      --ds-t-title-3: 1.125rem;
-      --ds-l-title-3: 1.5rem;
-      --ds-t-headline: 1rem;
+      --ds-t-large-title: 1.5rem;
+      --ds-l-large-title: 1.875rem;
+      --ds-t-title-1: 1.375rem;
+      --ds-l-title-1: 1.75rem;
+      --ds-t-title-2: 1.1875rem;
+      --ds-l-title-2: 1.5rem;
+      --ds-t-title-3: 1.0625rem;
+      --ds-l-title-3: 1.375rem;
+      --ds-t-headline: 0.9375rem;
       --ds-l-headline: 1.375rem;
-      --ds-t-body: 1rem;
-      --ds-l-body: 1.5rem;
-      --ds-t-callout: 0.9375rem;
-      --ds-l-callout: 1.375rem;
+      --ds-t-body: 0.9375rem;
+      --ds-l-body: 1.375rem;
+      --ds-t-callout: 0.875rem;
+      --ds-l-callout: 1.25rem;
       --ds-t-subhead: 0.875rem;
       --ds-l-subhead: 1.25rem;
-      --ds-t-footnote: 0.8125rem;
-      --ds-l-footnote: 1.125rem;
-      --ds-t-caption: 0.75rem;
-      --ds-l-caption: 1rem;
+      --ds-t-footnote: 0.75rem;
+      --ds-l-footnote: 1rem;
+      --ds-t-caption: 0.6875rem;
+      --ds-l-caption: 0.9375rem;
     }
   }
 
@@ -242,10 +242,10 @@
      is the button's invisible tap area (button.tsx), not its drawn size. */
   @media (pointer: coarse) {
     [data-design] {
-      --ds-control-sm: 2.25rem;
-      --ds-control-md: 2.75rem;
-      --ds-control-lg: 3rem;
-      --ds-row: 3.25rem;
+      --ds-control-sm: 2rem;
+      --ds-control-md: 2.5rem;
+      --ds-control-lg: 2.75rem;
+      --ds-row: 3rem;
     }
   }
 

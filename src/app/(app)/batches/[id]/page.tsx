@@ -49,6 +49,7 @@ async function Batch({ params }: { params: Promise<{ id: string }> }) {
   if (!batch) notFound();
   const running = batch.brands.some((b) => b.status === "queued" || b.status === "researching");
   const done = batch.brands.filter((b) => b.status !== "queued" && b.status !== "researching").length;
+  const firstToReview = batch.brands.find((b) => b.status === "needs_review");
 
   return (
     <>
@@ -56,18 +57,23 @@ async function Batch({ params }: { params: Promise<{ id: string }> }) {
         title={`${batch.brands.length} brand${batch.brands.length === 1 ? "" : "s"}`}
         back={{ href: "/", label: "Batches" }}
         actions={
-          <div className="flex items-center gap-3">
-            <span className="hidden text-callout text-label-secondary sm:inline">
-              Started {sayAgo(batch.createdAt)} · {done}/{batch.brands.length} done
+          <div className="flex items-center gap-2">
+            <span className="hidden text-subhead text-label-secondary md:inline">
+              {sayAgo(batch.createdAt)} · {done}/{batch.brands.length} researched
             </span>
             <Button kind="gray" icon="download" href={`/export?batch=${batch.id}`}>
-              Export this batch
+              Export
             </Button>
+            {firstToReview ? (
+              <Button kind="filled" href={`/brands/${firstToReview.id}`}>
+                Start reviewing
+              </Button>
+            ) : null}
           </div>
         }
       />
       <LiveRefresh topic={batchTopic(batch.id)} />
-      <div className="flex flex-col gap-10">
+      <div className="flex flex-col gap-8">
         {running ? (
           // While research runs, what each unfinished brand is doing; the table has their results.
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

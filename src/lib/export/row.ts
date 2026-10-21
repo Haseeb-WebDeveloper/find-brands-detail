@@ -25,7 +25,7 @@ export function toList(value: string): string {
     .join(MULTI_VALUE_DELIMITER);
 }
 
-/** One importer row for a brand: only approved campaigns, in their order, in consecutive slots. */
+/** One importer row for a brand: every campaign not switched off, in order, in consecutive slots. Gaps stay empty. */
 export function buildImportRow(state: ReviewState): RawImportRow {
   const row: RawImportRow = {
     name: state.name,
@@ -40,8 +40,8 @@ export function buildImportRow(state: ReviewState): RawImportRow {
     logo_url: state.logo ?? "",
     cover_image_url: state.cover ?? "",
   };
-  const approved = state.campaigns.filter((c) => c.status === "approved").slice(0, MAX_CAMPAIGN_SLOTS);
-  approved.forEach((c, i) => {
+  const included = state.campaigns.filter((c) => c.status !== "removed").slice(0, MAX_CAMPAIGN_SLOTS);
+  included.forEach((c, i) => {
     const cols = campaignColumns(i + 1);
     row[cols.title] = c.title;
     row[cols.description] = c.description;

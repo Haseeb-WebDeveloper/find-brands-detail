@@ -17,7 +17,7 @@ async function Export({ searchParams }: { searchParams: Promise<{ batch?: string
   return <ExportPanel groups={groups} batchId={batch && UUID.test(batch) ? batch : null} canExport={scopeCan(scope, "batches:write")} />;
 }
 
-/** Spec 2026-10-21 §2: choose batches or brands, check them, download the DB importer's CSV. */
+/** Pick a batch or brands and download the DB importer's CSV. */
 export default function ExportPage({ searchParams }: { searchParams: Promise<{ batch?: string }> }) {
   return (
     <AppPage>
