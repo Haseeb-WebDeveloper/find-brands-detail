@@ -9,6 +9,8 @@ export type TtProfile = {
   signature: string | null;
   followers: number;
   private: boolean;
+  /** The largest profile picture (1080 px); a signed link that expires. */
+  avatar: string | null;
 };
 
 export type TtLookup = { ok: true; profile: TtProfile } | { ok: false; reason: "not_found" | "blocked"; message: string };
@@ -25,7 +27,7 @@ const BLOCKED = { ok: false, reason: "blocked", message: "TikTok didn't show the
 type Detail = {
   statusCode?: number;
   userInfo?: {
-    user?: { uniqueId?: string; nickname?: string; verified?: boolean; signature?: string; privateAccount?: boolean; bioLink?: { link?: string } };
+    user?: { uniqueId?: string; nickname?: string; verified?: boolean; signature?: string; privateAccount?: boolean; bioLink?: { link?: string }; avatarLarger?: string };
     stats?: { followerCount?: number };
   };
 };
@@ -57,6 +59,7 @@ export function parseProfile(html: string, username: string): TtLookup {
       signature: user.signature || null,
       followers: detail?.userInfo?.stats?.followerCount ?? 0,
       private: user.privateAccount === true,
+      avatar: user.avatarLarger || null,
     },
   };
 }

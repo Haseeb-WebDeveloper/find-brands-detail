@@ -8,7 +8,7 @@ const cand = (handle: string, over: Partial<TtCandidate> & { followers?: number;
     foundOn: [],
     bio: { reached: null, via: null },
     sameBioAsInstagram: false,
-    lookup: { ok: true, profile: { username: handle, name: name ?? null, verified: false, bioLink: null, signature: null, followers: followers ?? 100_000, private: false } },
+    lookup: { ok: true, profile: { username: handle, name: name ?? null, verified: false, bioLink: null, signature: null, followers: followers ?? 100_000, private: false, avatar: null } },
     ...rest,
   };
 };

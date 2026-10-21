@@ -47,6 +47,7 @@ export async function runTiktokStep(brandId: string, log: ResearchLog): Promise<
             verified: p?.verified ?? null,
             private: p?.private ?? null,
             bioLink: p?.bioLink ?? null,
+            avatarUrl: p?.avatar ?? null,
             bioReached: c.bio.reached,
             sameBioAsInstagram: c.sameBioAsInstagram,
             lookup: c.lookup.ok ? "ok" : c.lookup.reason,

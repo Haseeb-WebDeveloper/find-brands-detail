@@ -19,7 +19,7 @@ const facts = (tiktok: string[]): PageFacts => ({
 
 const ok = (username: string, followers: number, bioLink: string | null = null, name: string | null = null): TtLookup => ({
   ok: true,
-  profile: { username, name, verified: false, bioLink, signature: null, followers, private: false },
+  profile: { username, name, verified: false, bioLink, signature: null, followers, private: false, avatar: null },
 });
 
 function deps(profiles: Record<string, TtLookup>, linkPage: string[] = []) {

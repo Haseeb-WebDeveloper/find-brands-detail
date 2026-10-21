@@ -15,8 +15,13 @@ describe("parseProfile", () => {
     });
     expect(parseProfile(html, "celimax.global")).toEqual({
       ok: true,
-      profile: { username: "celimax.global", name: "celimax.global", verified: false, bioLink: "https://linktr.ee/celimax", signature: "Honest skin", followers: 229100, private: false },
+      profile: { username: "celimax.global", name: "celimax.global", verified: false, bioLink: "https://linktr.ee/celimax", signature: "Honest skin", followers: 229100, private: false, avatar: null },
     });
+  });
+
+  it("reads the large profile picture", () => {
+    const html = page({ statusCode: 0, userInfo: { user: { uniqueId: "a", avatarLarger: "https://p16.tiktokcdn.com/a.jpeg" }, stats: { followerCount: 1 } } });
+    expect(parseProfile(html, "a")).toMatchObject({ ok: true, profile: { avatar: "https://p16.tiktokcdn.com/a.jpeg" } });
   });
 
   it("says when the account does not exist", () => {
