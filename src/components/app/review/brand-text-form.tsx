@@ -2,9 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/design/button";
 import { Segmented } from "@/design/segmented";
-import { TextField } from "@/design/text-field";
 import { useToast } from "@/design/toast";
 import { cn } from "@/design/cn";
 import { saveBrandText } from "@/lib/review/actions";
@@ -12,106 +10,108 @@ import { saveBrandText } from "@/lib/review/actions";
 type Text = { description: string; tier: string; aesthetic: string; industry: string; regions: string };
 type Key = keyof Text;
 
-const ROWS: { key: Key; label: string }[] = [
-  { key: "description", label: "Description" },
-  { key: "tier", label: "Tier" },
-  { key: "aesthetic", label: "Aesthetic" },
-  { key: "industry", label: "Industry" },
-  { key: "regions", label: "Regions" },
-];
 const TIERS = [
   { value: "luxury", label: "Luxury" },
   { value: "premium", label: "Premium" },
   { value: "masstige", label: "Masstige" },
 ] as const;
-const LISTS = new Set<Key>(["aesthetic", "industry", "regions"]);
+const LISTS: Key[] = ["aesthetic", "industry", "regions"];
+const LABEL: Record<Key, string> = { description: "Description", tier: "Tier", aesthetic: "Aesthetic", industry: "Industry", regions: "Regions" };
 
 /** Stored pipe-separated (the importer's form); shown and typed comma-separated. */
-const shown = (key: Key, value: string) => (LISTS.has(key) ? value.split("|").filter(Boolean).join(", ") : value);
-const capital = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+const shown = (key: Key, value: string) => (LISTS.includes(key) ? value.split("|").filter(Boolean).join(", ") : value);
 
-/** One detail: its value at a glance, "Change" edits it in place. */
-function Row({ brandId, field, label, text, canEdit, first }: { brandId: string; field: Key; label: string; text: Text; canEdit: boolean; first: boolean }) {
+/** Reads as text; click and type, it saves when you leave it (or press Enter). */
+const FIELD =
+  "w-full rounded-field border border-transparent bg-transparent px-2 py-1.5 -mx-2 text-body text-label placeholder:text-label-tertiary hover:bg-fill/60 focus:border-tint focus:bg-surface focus-visible:outline-none";
+
+/** The DB's brand fields, drafted by research, edited where they stand (owner, 2026-10-21: no "Change" step). */
+export function BrandTextForm({ brandId, initial, canEdit }: { brandId: string; initial: Text; canEdit: boolean }) {
   const router = useRouter();
   const toast = useToast();
-  const [editing, setEditing] = useState(false);
-  const [value, setValue] = useState(shown(field, text[field]));
-  const [pending, start] = useTransition();
-  const current = shown(field, text[field]);
+  const [text, setText] = useState<Text>(() => ({
+    description: initial.description,
+    tier: initial.tier,
+    aesthetic: shown("aesthetic", initial.aesthetic),
+    industry: shown("industry", initial.industry),
+    regions: shown("regions", initial.regions),
+  }));
+  const [saved, setSaved] = useState<Text>(text);
+  const [, start] = useTransition();
 
-  const save = (next: string) =>
+  const save = (next: Text) => {
+    if ((Object.keys(next) as Key[]).every((k) => next[k].trim() === saved[k].trim())) return;
     start(async () => {
-      const r = await saveBrandText(brandId, { ...text, [field]: next });
+      const r = await saveBrandText(brandId, next);
       if (!r.ok) return toast(r.error);
-      setEditing(false);
+      setSaved(next);
       router.refresh();
     });
+  };
+  const set = (key: Key) => (e: { currentTarget: { value: string } }) => setText({ ...text, [key]: e.currentTarget.value });
+  const onEnter = (e: React.KeyboardEvent<HTMLElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      (e.currentTarget as HTMLElement).blur();
+    }
+  };
 
-  return (
-    <div className={cn("flex flex-col gap-2 px-4 py-3", !first && "border-t border-separator")}>
-      <div className="flex items-start gap-4">
-        <span className="w-24 shrink-0 pt-0.5 text-subhead text-label-secondary">{label}</span>
-        <div className="min-w-0 flex-1">
-          {editing ? null : current ? (
-            <p className={cn("text-body text-label", field !== "description" && "truncate")}>{field === "tier" ? capital(current) : current}</p>
-          ) : (
-            <span className="text-body text-label-tertiary">—</span>
-          )}
-        </div>
-        {canEdit && !editing ? (
-          <button
-            type="button"
-            onClick={() => {
-              setValue(current);
-              setEditing(true);
-            }}
-            className="shrink-0 text-subhead text-tint-text hover:underline"
-          >
-            {current ? "Change" : "Add"}
-          </button>
-        ) : null}
-      </div>
-
-      {editing ? (
-        <div className="flex flex-col gap-2 sm:pl-28">
-          {field === "tier" ? (
-            <Segmented label="Tier" value={(TIERS.find((t) => t.value === value)?.value ?? "") as (typeof TIERS)[number]["value"]} onValueChange={(tier) => save(tier)} options={TIERS} />
-          ) : field === "description" ? (
-            <textarea
-              value={value}
-              onChange={(e) => setValue(e.currentTarget.value)}
-              rows={4}
-              autoFocus
-              className="w-full rounded-field border border-transparent bg-fill px-3 py-2 text-body text-label focus:border-tint focus:bg-surface focus-visible:outline-none"
-            />
-          ) : (
-            <TextField label={label} hideLabel autoFocus placeholder="Separate with commas" value={value} onChange={(e) => setValue(e.currentTarget.value)} />
-          )}
-          <div className="flex gap-2">
-            {field !== "tier" ? (
-              <Button kind="filled" size="sm" disabled={pending} onClick={() => save(value)}>
-                {pending ? "Saving…" : "Save"}
-              </Button>
-            ) : null}
-            <Button kind="gray" size="sm" disabled={pending} onClick={() => setEditing(false)}>
-              Cancel
-            </Button>
-          </div>
-        </div>
-      ) : null}
+  const row = (key: Key, control: React.ReactNode, first = false) => (
+    <div key={key} className={cn("flex items-start gap-4 px-4 py-2.5", !first && "border-t border-separator")}>
+      <span className="w-24 shrink-0 pt-2 text-subhead text-label-secondary">{LABEL[key]}</span>
+      <div className="min-w-0 flex-1">{control}</div>
     </div>
   );
-}
 
-/** The DB's brand fields, drafted by research, laid out like the facts above: one row each. */
-export function BrandTextForm({ brandId, initial, canEdit }: { brandId: string; initial: Text; canEdit: boolean }) {
   return (
     <section className="flex flex-col gap-3">
       <h2 className="text-headline text-label">Brand details</h2>
       <div className="flex flex-col rounded-card bg-surface">
-        {ROWS.map((r, i) => (
-          <Row key={r.key} brandId={brandId} field={r.key} label={r.label} text={initial} canEdit={canEdit} first={i === 0} />
-        ))}
+        {row(
+          "description",
+          <textarea
+            aria-label="Description"
+            value={text.description}
+            onChange={set("description")}
+            onBlur={() => save(text)}
+            onKeyDown={onEnter}
+            disabled={!canEdit}
+            placeholder="—"
+            className={cn(FIELD, "field-sizing-content min-h-9 resize-none")}
+          />,
+          true,
+        )}
+        {row(
+          "tier",
+          <div className="pt-1">
+            <Segmented
+              label="Tier"
+              value={(TIERS.find((t) => t.value === text.tier)?.value ?? "") as (typeof TIERS)[number]["value"]}
+              onValueChange={(tier) => {
+                if (!canEdit) return;
+                const next = { ...text, tier };
+                setText(next);
+                save(next);
+              }}
+              options={TIERS}
+            />
+          </div>,
+        )}
+        {LISTS.map((key) =>
+          row(
+            key,
+            <input
+              aria-label={LABEL[key]}
+              value={text[key]}
+              onChange={set(key)}
+              onBlur={() => save(text)}
+              onKeyDown={onEnter}
+              disabled={!canEdit}
+              placeholder="—"
+              className={FIELD}
+            />,
+          ),
+        )}
       </div>
     </section>
   );
