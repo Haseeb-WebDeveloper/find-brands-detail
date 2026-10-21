@@ -12,7 +12,7 @@ const SHAPE = { logo: 1, cover: 16 / 11, campaign: 200 / 236 } as const;
 
 const day = (d: Date) => d.toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
 
-/** Spec §7, Logo and cover. */
+/** Spec §7, Logo and cover, and campaign images. */
 export function scoreImage(c: ImageCandidate, now: Date): ImageVerdict {
   const { check } = c;
   if (!check.ok || !check.width || !check.height) return { score: "rejected", reason: check.reason ?? "Not an image." };
