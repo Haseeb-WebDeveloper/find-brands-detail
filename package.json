@@ -34,6 +34,7 @@
     "cheerio": "^1.2.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "image-size": "^2.0.4",
     "inngest": "^4.18.0",
     "lucide-react": "1.52.0",
     "motion": "12.43.0",
