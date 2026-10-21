@@ -22,11 +22,13 @@ export type BrandDetail = {
   website: FieldSection;
   instagram: FieldSection;
   tiktok: FieldSection;
+  logo: FieldSection;
+  cover: FieldSection;
   pages: { url: string; source: string; archivedAt: string | null; facts: PageFacts }[];
   log: LogLine[];
 };
 
-const FIELDS = ["website", "instagram", "tiktok"] as const;
+const FIELDS = ["website", "instagram", "tiktok", "logo", "cover"] as const;
 
 export async function getBrandDetail(_scope: TeamScope, id: string): Promise<BrandDetail | null> {
   const brand = await prisma.brand.findUnique({
@@ -63,6 +65,8 @@ export async function getBrandDetail(_scope: TeamScope, id: string): Promise<Bra
     website: section("website"),
     instagram: section("instagram"),
     tiktok: section("tiktok"),
+    logo: section("logo"),
+    cover: section("cover"),
     pages: brand.pages.map((p) => ({ url: p.url, source: p.source, archivedAt: p.archivedAt, facts: p.facts as PageFacts })),
     log: brand.logs.map((l) => ({ id: l.id, brandId: l.brandId, brandName: brand.name, level: l.level as LogLevel, message: l.message, at: l.createdAt.toISOString() })),
   };

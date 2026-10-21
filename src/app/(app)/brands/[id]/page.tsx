@@ -150,12 +150,50 @@ async function Brand({ params }: { params: Promise<{ id: string }> }) {
         )}
       </section>
 
+      {(["logo", "cover"] as const).map((field) => (
+        <section key={field} className="flex flex-col gap-2">
+          <h2 className="text-headline text-label">{field === "logo" ? "Logo" : "Cover"}</h2>
+          {brand[field].candidates.length === 0 ? (
+            <p className="text-callout text-label-secondary">No {field} image checked yet.</p>
+          ) : (
+            <ListGroup>
+              {brand[field].candidates.map((c, i) => (
+                <ListRow
+                  key={c.id}
+                  first={i === 0}
+                  icon={
+                    // A remote image at its own address: the reviewer sees exactly what will be exported.
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={c.value}
+                      alt=""
+                      loading="lazy"
+                      referrerPolicy="no-referrer"
+                      className={field === "logo" ? "size-10 shrink-0 rounded-lg bg-fill object-cover" : "h-10 w-[3.6rem] shrink-0 rounded-lg bg-fill object-cover"}
+                    />
+                  }
+                  title={
+                    <span className="flex items-center gap-2">
+                      {c.id === brand[field].selectedCandidateId ? <Pill tone="blue">Chosen</Pill> : null}
+                      <Link href={c.value} target="_blank" rel="noreferrer" className="underline-offset-4 hover:underline">
+                        {c.source}
+                      </Link>
+                    </span>
+                  }
+                  detail={c.reason}
+                  trailing={<Pill tone={TONE[c.score]}>{LABEL[c.score]}</Pill>}
+                />
+              ))}
+            </ListGroup>
+          )}
+        </section>
+      ))}
+
       <section className="flex flex-col gap-2">
         <h2 className="text-headline text-label">Pages read</h2>
         <ListGroup>
           <ListRow first title="Brand sites" detail={`${live.length} live${archived.length ? `, ${archived.length} from the Wayback Machine` : ""}`} />
         </ListGroup>
-        <p className="text-footnote text-label-secondary">Logo and cover are checked in the next build step.</p>
       </section>
 
       <ResearchLog lines={brand.log} live={brand.status === "queued" || brand.status === "researching"} />
