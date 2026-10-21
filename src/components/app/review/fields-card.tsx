@@ -6,15 +6,29 @@ const LABEL: Record<ReviewField, string> = { website: "Website", instagram: "Ins
 
 type Candidate = BrandDetail["website"]["candidates"][number];
 
+const compact = new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 });
+
+type Evidence = { followers?: number | null; verified?: boolean | null; kind?: string; width?: number | null; height?: number | null };
+
+/** Where a picture came from, in a word or two. */
+function origin(c: Candidate, e: Evidence): string {
+  if (c.source === "Typed by a reviewer" || e.kind === "typed") return "Added by you";
+  if (e.kind === "instagram") return "Instagram";
+  if (e.kind === "tiktok") return "TikTok";
+  return c.source;
+}
+
 function toRow(field: ReviewField, c: Candidate): RowCandidate {
-  const e = c.evidence as { followers?: number | null };
-  const followers = typeof e.followers === "number" ? `${e.followers.toLocaleString("en-US")} followers · ` : "";
-  if (field === "instagram") return { id: c.id, label: `@${c.value}`, href: `https://www.instagram.com/${c.value}/`, image: null, score: c.score, note: `${followers}${c.reason}` };
-  if (field === "tiktok") return { id: c.id, label: `@${c.value}`, href: `https://www.tiktok.com/@${c.value}`, image: null, score: c.score, note: `${followers}${c.reason}` };
-  if (field === "website") return { id: c.id, label: c.value.replace(/^https?:\/\//, "").replace(/\/$/, ""), href: c.value, image: null, score: c.score, note: c.reason };
-  // Logo and cover: the size says most; the source names where it came from.
-  const size = c.reason.match(/\d+×\d+/)?.[0];
-  return { id: c.id, label: size ? `${size} · ${c.source}` : c.source, href: c.value, image: c.value, score: c.score, note: c.reason };
+  const e = c.evidence as Evidence;
+  const base = { id: c.id, score: c.score, note: c.reason };
+  if (field === "instagram" || field === "tiktok") {
+    const meta = [typeof e.followers === "number" ? `${compact.format(e.followers)} followers` : null, e.verified ? "verified" : null].filter(Boolean).join(" · ");
+    const href = field === "instagram" ? `https://www.instagram.com/${c.value}/` : `https://www.tiktok.com/@${c.value}`;
+    return { ...base, label: `@${c.value}`, meta, href, image: null };
+  }
+  if (field === "website") return { ...base, label: c.value.replace(/^https?:\/\//, "").replace(/\/$/, ""), meta: "", href: c.value, image: null };
+  const size = e.width && e.height ? `${e.width}×${e.height}` : (c.reason.match(/\d+×\d+/)?.[0] ?? "");
+  return { ...base, label: origin(c, e), meta: size, href: c.value, image: c.value };
 }
 
 /** The five facts, one row each: the chosen value at a glance, everything else behind "Change". */

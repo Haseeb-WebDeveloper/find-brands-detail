@@ -78,3 +78,20 @@ describe("campaign images", () => {
     expect(chooseImage([wide, tall].map((c) => ({ candidate: c, verdict: scoreImage(c, NOW) })))?.url).toBe("tall");
   });
 });
+
+describe("owner's rules (2026-10-21)", () => {
+  it("rejects a portrait or square cover", () => {
+    expect(scoreImage(cand({ slot: "cover", w: 1080, h: 1350 }), NOW)).toEqual({ score: "rejected", reason: "1080×1350: not a landscape image." });
+    expect(scoreImage(cand({ slot: "cover", w: 1200, h: 1200 }), NOW).score).toBe("rejected");
+    expect(scoreImage(cand({ slot: "cover", w: 1200, h: 628 }), NOW).score).toBe("proven");
+  });
+
+  it("chooses the Instagram profile picture for the logo, then TikTok's, over a proven site logo", () => {
+    const site = cand({ url: "site", w: 600, h: 600 });
+    const ig = cand({ url: "ig", source: { kind: "instagram", label: "ig" }, expiresAt: new Date("2026-10-24T00:00:00Z") });
+    const tt = cand({ url: "tt", source: { kind: "tiktok", label: "tt" }, expiresAt: new Date("2026-10-24T00:00:00Z") });
+    const all = [site, tt, ig].map((c) => ({ candidate: c, verdict: scoreImage(c, NOW) }));
+    expect(chooseImage(all)?.url).toBe("ig");
+    expect(chooseImage(all.filter((s) => s.candidate.url !== "ig"))?.url).toBe("tt");
+  });
+});

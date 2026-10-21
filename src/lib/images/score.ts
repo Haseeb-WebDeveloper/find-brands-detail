@@ -9,6 +9,10 @@ const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_LOGO_RATIO = 2;
 /** The shape each slot is shown in: logos square, covers and campaigns as the importer fills them (db-admin FILL_FRAME_ASPECT). */
 const SHAPE = { logo: 1, cover: 16 / 11, campaign: 200 / 236 } as const;
+/** A cover is a landscape banner; anything narrower than this is a portrait or a square (owner, 2026-10-21). */
+const MIN_COVER_RATIO = 1.3;
+/** Logos: the brand's own profile picture first, Instagram's then TikTok's (owner, 2026-10-21: "that is the best option"). */
+const LOGO_SOURCE = { instagram: 0, tiktok: 1, site: 2, third_party: 3 } as const;
 
 const day = (d: Date) => d.toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
 
@@ -21,6 +25,9 @@ export function scoreImage(c: ImageCandidate, now: Date): ImageVerdict {
   const ratio = Math.max(check.width, check.height) / Math.min(check.width, check.height);
   if (c.slot === "logo" && ratio > MAX_LOGO_RATIO) {
     return { score: "review", reason: `${size}: too ${check.width > check.height ? "wide" : "tall"} for the square logo frame, so it would be cropped.` };
+  }
+  if (c.slot === "cover" && check.width / check.height < MIN_COVER_RATIO) {
+    return { score: "rejected", reason: `${size}: not a landscape image.` };
   }
   if (c.source.kind === "third_party") return { score: "review", reason: `${size} from ${c.source.label}, a third-party page.` };
   const from = `${size} from ${c.source.label}.`;
@@ -39,8 +46,16 @@ function misfit(c: ImageCandidate): number {
   return Math.abs(Math.log(width / height / SHAPE[c.slot]));
 }
 
-/** Proven first, then review; within a level the best-fitting shape, then the most pixels. */
+/**
+ * Logos: the Instagram profile picture, else TikTok's, else the site's best. Everything else: proven
+ * first, then review; within a level the best-fitting shape, then the most pixels.
+ */
 export function chooseImage(scored: { candidate: ImageCandidate; verdict: ImageVerdict }[]): ImageCandidate | null {
+  const usable = scored.filter((s) => s.verdict.score !== "rejected").map((s) => s.candidate);
+  const profile = usable
+    .filter((c) => c.slot === "logo" && (c.source.kind === "instagram" || c.source.kind === "tiktok"))
+    .sort((a, b) => LOGO_SOURCE[a.source.kind] - LOGO_SOURCE[b.source.kind]);
+  if (profile.length > 0) return profile[0];
   const rank = (c: ImageCandidate) => [Math.round(misfit(c) * 10), -Math.min(c.check.width ?? 0, c.check.height ?? 0)];
   const better = (a: ImageCandidate, b: ImageCandidate) => {
     const [x, y] = [rank(a), rank(b)];

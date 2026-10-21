@@ -7,6 +7,7 @@ import { TextField } from "@/design/text-field";
 import { useToast } from "@/design/toast";
 import { cn } from "@/design/cn";
 import type { CampaignCard } from "@/lib/brands/scoped";
+import { ImageViewer } from "@/components/app/review/image-viewer";
 import { addCampaign, addCampaignImage, saveCampaign, selectCampaignImage, setCampaignStatus } from "@/lib/review/actions";
 
 /** The DB importer's limit. */
@@ -113,19 +114,27 @@ function EditDialog({ c, open, onOpenChange }: { c: CampaignCard; open: boolean;
 function Tile({ c, canEdit }: { c: CampaignCard; canEdit: boolean }) {
   const [pending, run] = useRun();
   const [editing, setEditing] = useState(false);
+  const [viewing, setViewing] = useState(false);
   const image = c.images.find((i) => i.selected) ?? null;
+  // The chosen image first, then the others that passed, for the full-screen viewer.
+  const gallery = [...c.images.filter((i) => i.selected), ...c.images.filter((i) => !i.selected && i.score !== "rejected")];
   const out = c.status === "removed";
   return (
     <div className={cn("group relative flex flex-col gap-2", out && "opacity-45")}>
-      <button type="button" disabled={!canEdit} onClick={() => setEditing(true)} className="flex flex-col gap-2 text-left">
-        {image ? (
-          // eslint-disable-next-line @next/next/no-img-element
+      {image ? (
+        <button type="button" onClick={() => setViewing(true)} className="cursor-zoom-in" aria-label={`View ${c.title} full screen`}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={image.url} alt="" loading="lazy" referrerPolicy="no-referrer" className="aspect-[200/236] w-full rounded-lg bg-fill object-cover" />
-        ) : (
-          <div className="flex aspect-[200/236] w-full items-center justify-center rounded-lg bg-fill text-footnote text-label-tertiary">No image</div>
-        )}
-        <span className="line-clamp-2 text-callout text-label">{c.title}</span>
+        </button>
+      ) : (
+        <button type="button" disabled={!canEdit} onClick={() => setEditing(true)} className="flex aspect-[200/236] w-full items-center justify-center rounded-lg bg-fill text-footnote text-label-tertiary">
+          No image
+        </button>
+      )}
+      <button type="button" disabled={!canEdit} onClick={() => setEditing(true)} className="line-clamp-2 text-left text-callout text-label hover:underline" title={canEdit ? "Edit" : undefined}>
+        {c.title}
       </button>
+      {viewing ? <ImageViewer images={gallery.map((i) => ({ url: i.url, caption: c.title }))} start={0} onClose={() => setViewing(false)} /> : null}
       {canEdit ? (
         <button
           type="button"
