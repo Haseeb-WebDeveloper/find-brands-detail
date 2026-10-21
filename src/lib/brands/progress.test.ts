@@ -2,7 +2,17 @@ import { describe, expect, it } from "vitest";
 import { progressText, progressTone } from "@/lib/brands/progress";
 import type { BrandRow } from "@/lib/batches/scoped";
 
-const base: BrandRow = { id: "b1", name: "TIRTIR", status: "queued", currentStep: null, reviewCount: 0, error: null, lastLog: null };
+const base: BrandRow = {
+  id: "b1",
+  name: "TIRTIR",
+  status: "queued",
+  currentStep: null,
+  reviewCount: 0,
+  error: null,
+  lastLog: null,
+  fields: { website: null, instagram: null, tiktok: null, logo: null, cover: null },
+  campaigns: { approved: 0, total: 0 },
+};
 
 describe("progressText", () => {
   it("describes each status", () => {

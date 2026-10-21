@@ -1,5 +1,6 @@
 import "server-only";
-import type { BrandStatus } from "@prisma/client";
+import type { BrandStatus, CandidateScore } from "@prisma/client";
+import { REVIEW_FIELDS, type ReviewField } from "@/lib/export/row";
 import { prisma } from "@/lib/prisma";
 import type { TeamScope } from "@/lib/auth/scope";
 import type { LogLevel } from "@/lib/research/log-types";
@@ -27,6 +28,9 @@ export type BrandRow = {
   error: string | null;
   /** The brand's latest log line: what it is doing right now. */
   lastLog: string | null;
+  /** The chosen value's score per field; null when nothing is chosen. */
+  fields: Record<ReviewField, CandidateScore | null>;
+  campaigns: { approved: number; total: number };
 };
 
 export type LogLine = { id: string; brandId: string; brandName: string; level: LogLevel; message: string; at: string };
@@ -78,6 +82,8 @@ export async function getBatch(
           reviewCount: true,
           error: true,
           logs: { orderBy: { createdAt: "desc" }, take: 1, select: { message: true } },
+          selections: { select: { field: true, candidate: { select: { score: true } } } },
+          campaigns: { select: { status: true } },
         },
       },
     },
@@ -93,7 +99,12 @@ export async function getBatch(
   return {
     id: batch.id,
     createdAt: batch.createdAt.toISOString(),
-    brands: batch.brands.map(({ logs, ...b }) => ({ ...b, lastLog: logs[0]?.message ?? null })),
+    brands: batch.brands.map(({ logs, selections, campaigns, ...b }) => ({
+      ...b,
+      lastLog: logs[0]?.message ?? null,
+      fields: Object.fromEntries(REVIEW_FIELDS.map((f) => [f, selections.find((x) => x.field === f)?.candidate?.score ?? null])) as Record<ReviewField, CandidateScore | null>,
+      campaigns: { approved: campaigns.filter((c) => c.status === "approved").length, total: campaigns.filter((c) => c.status !== "removed").length },
+    })),
     log: log.map((l) => ({
       id: l.id,
       brandId: l.brandId,

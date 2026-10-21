@@ -15,6 +15,7 @@ import { LiveRefresh } from "@/components/app/live-refresh";
 import { CardsLoading } from "@/components/app/shell/page-skeletons";
 import { ResearchLog } from "@/components/app/research/research-log";
 import { ProgressBar } from "@/components/app/research/progress-bar";
+import { BatchTable } from "@/components/app/review/batch-table";
 
 export const metadata: Metadata = { title: "Batch" };
 
@@ -57,11 +58,17 @@ async function Batch({ params }: { params: Promise<{ id: string }> }) {
       />
       <LiveRefresh topic={batchTopic(batch.id)} />
       <div className="flex flex-col gap-8 pb-10">
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {batch.brands.map((b) => (
-            <BrandCard key={b.id} brand={b} />
-          ))}
-        </div>
+        {running ? (
+          // While research runs, what each unfinished brand is doing; the table has their results.
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {batch.brands
+              .filter((b) => b.status === "queued" || b.status === "researching")
+              .map((b) => (
+                <BrandCard key={b.id} brand={b} />
+              ))}
+          </div>
+        ) : null}
+        <BatchTable brands={batch.brands} />
         <ResearchLog lines={batch.log} showBrand live={running} />
       </div>
     </>
