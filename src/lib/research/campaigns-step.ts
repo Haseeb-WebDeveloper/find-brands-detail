@@ -32,7 +32,11 @@ export async function runCampaignsStep(brandId: string, log: ResearchLog): Promi
   const campaigns = await researchCampaigns(
     input,
     {
-      search: (prompt, l) => askWithSearch(prompt, { what: `${name}'s campaigns`, effort: "low", log: l, accept: (t) => parseCampaignsAnswer(t).length > 0 }),
+      // A second try when the first finds nothing: the answer varies from run to run.
+      search: async (prompt, l) => {
+        const ask = () => askWithSearch(prompt, { what: `${name}'s campaigns`, effort: "low", log: l, accept: (t) => parseCampaignsAnswer(t).length > 0 });
+        return (await ask()) ?? ask();
+      },
       write: askPlain,
       fetchPage,
       checkImage: (url) => checkImageUrl(url, "campaign"),

@@ -7,6 +7,7 @@ const page = (url: string, html: string, ok = true): FetchedPage => ({ requested
 
 const PAGES: Record<string, string> = {
   "https://tirtir.global/blogs/press/v": `<title>V&YOU</title><meta property="og:image" content="https://tirtir.global/v.jpg"><article><p>TIRTIR named V its global ambassador.</p></article>`,
+  "https://tirtir.global/tour": `<title>The First Light</title><article><p>A moving pop-up world tour.</p></article>`,
   "https://www.rollingstone.com/v": `<title>V x TIRTIR</title><meta property="og:image" content="https://rs.com/v.jpg"><p>V fronts TIRTIR.</p>`,
 };
 
@@ -18,7 +19,7 @@ function deps() {
           campaigns: [
             { title: "V&YOU: Let's Radiate", date: "2025-11", sources: ["https://tirtir.global/blogs/press/v", "https://www.rollingstone.com/v"] },
             { title: "Invented", date: "2025-01", sources: ["https://tirtir.global/404"] },
-            { title: "World Tour; The First Light", date: "2025-12", sources: ["https://tirtir.global/404b"] },
+            { title: "World Tour; The First Light", date: "2025-12", sources: ["https://tirtir.global/404b", "https://tirtir.global/tour"] },
           ],
         }),
     ),
@@ -40,7 +41,7 @@ const input = {
 const NOW = new Date("2026-10-21T00:00:00Z");
 
 describe("researchCampaigns", () => {
-  it("keeps campaigns with a source that loads or a matching post, newest first, with brand images chosen", async () => {
+  it("keeps campaigns with a source page that loads, newest first, with brand images chosen", async () => {
     const d = deps();
     const r = await researchCampaigns(input, d, undefined, NOW);
     expect(r.map((c) => c.title)).toEqual(["World Tour; The First Light", "V&YOU: Let's Radiate"]);
@@ -49,8 +50,9 @@ describe("researchCampaigns", () => {
     expect(v.description).toBe("V fronts TIRTIR's first global campaign.");
     expect(v.chosen?.url).toBe("https://tirtir.global/v.jpg");
     expect(v.images.find((i) => i.candidate.url === "https://rs.com/v.jpg")?.verdict.score).toBe("review");
+    // The tour page has no image of its own; the matching Instagram post supplies one.
     expect(r[0].chosen?.source.kind).toBe("instagram");
-    expect(r[0].sources).toEqual([]);
+    expect(r[0].sources).toEqual(["https://tirtir.global/tour"]);
   });
 
   it("re-asks a description over 500 characters, then cuts it", async () => {
@@ -70,6 +72,14 @@ describe("researchCampaigns", () => {
     const r = await researchCampaigns(input, d, undefined, NOW);
     expect(r.find((c) => c.title.startsWith("World"))?.description).toBe("A pop-up world tour.");
     expect(d.write).toHaveBeenCalledTimes(2);
+  });
+
+  it("drops a campaign only an Instagram caption mentions", async () => {
+    const d = deps();
+    d.fetchPage.mockImplementation(async (url: string) => (url === "https://tirtir.global/tour" ? page(url, "", false) : PAGES[url] ? page(url, PAGES[url]) : page(url, "", false)));
+    d.write.mockResolvedValueOnce(JSON.stringify({ descriptions: ["V fronts TIRTIR's first global campaign."] }));
+    const r = await researchCampaigns(input, d, undefined, NOW);
+    expect(r.map((c) => c.title)).toEqual(["V&YOU: Let's Radiate"]);
   });
 
   it("returns nothing when the search finds nothing", async () => {

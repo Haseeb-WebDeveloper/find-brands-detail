@@ -15,7 +15,8 @@ export function describePrompt(brand: string, items: { title: string; date: stri
     `You write campaign notes for a beauty-industry database. For each campaign of the brand "${brand}" below, write one description ` +
     `of 300 to ${TARGET} characters (at most ${TARGET} characters): first what the campaign shows (who, the visual idea, the setting), ` +
     `then why it matters for the brand. Plain, analytical English; no hashtags, no emojis, no marketing superlatives. ` +
-    `Use only facts from the source text; if it says too little, write less rather than invent. ` +
+    `Use only facts stated in the source text. Never guess or hedge (no "likely", "presumably", "may", "appears to"). ` +
+    `If the source text gives fewer than two facts about a campaign, give an empty string for it. ` +
     `Answer with JSON only: {"descriptions":["...", "..."]} in the same order.\n\n${blocks}`
   );
 }

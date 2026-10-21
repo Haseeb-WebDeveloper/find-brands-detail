@@ -14,5 +14,9 @@ describe("matchPosts", () => {
     expect(matchPosts("World Tour; The First Light", "TIRTIR", posts)).toEqual(["https://ig/3.jpg"]);
     // "Glow" is a word every beauty caption uses; it doesn't identify a campaign.
     expect(matchPosts("TIRTIR Glow", "TIRTIR", posts)).toEqual([]);
+    // Seasons and generic words never match on their own.
+    expect(matchPosts("Spring Renewal Campaign", "TIRTIR", [{ mediaType: "IMAGE", mediaUrl: "https://ig/5.jpg", caption: "Spring is here" }])).toEqual([]);
+    // One shared word out of four is a coincidence.
+    expect(matchPosts("World Tour; The First Light", "TIRTIR", [{ mediaType: "IMAGE", mediaUrl: "https://ig/6.jpg", caption: "First look at our toner" }])).toEqual([]);
   });
 });

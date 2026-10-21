@@ -56,7 +56,8 @@ export async function researchCampaigns(input: CampaignsInput, deps: CampaignsDe
       if (p.ok) pages.push({ url, ...readCampaignPage(p.html, p.finalUrl ?? url) });
     }
     const posts = input.instagram ? matchPosts(c.title, input.brand, input.instagram.posts) : [];
-    if (pages.length === 0 && posts.length === 0) {
+    // Posts only add images: a caption match alone is too weak to prove a campaign exists.
+    if (pages.length === 0) {
       await log(`Dropped "${c.title}": none of its source pages loaded.`, "warn");
       continue;
     }
@@ -87,7 +88,7 @@ export async function researchCampaigns(input: CampaignsInput, deps: CampaignsDe
       sources: pages.map((p) => p.url),
       images,
       chosen,
-      text: pages.map((p) => p.text).join("\n\n") || `An Instagram post by @${input.instagram?.handle} mentions ${c.title}.`,
+      text: pages.map((p) => p.text).join("\n\n"),
     });
   }
   if (kept.length === 0) return [];

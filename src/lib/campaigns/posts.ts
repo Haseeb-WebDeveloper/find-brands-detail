@@ -4,6 +4,9 @@ import { compactName } from "@/lib/website/domain";
 const STOP = new Set([
   "with", "from", "your", "this", "that", "launch", "campaign", "collection", "edition", "glow",
   "skin", "beauty", "care", "skincare", "makeup", "official", "global", "new", "the", "and", "for",
+  "spring", "summer", "autumn", "fall", "winter", "holiday", "season", "seasonal", "renewal", "radiance", "radiant",
+  "hydration", "routine", "series", "creator", "creators", "collaboration", "relaunch", "kit", "gift", "gifts", "set",
+  "hero", "store", "popup", "event", "special", "limited",
 ]);
 const MAX_POSTS = 2;
 
@@ -17,7 +20,8 @@ export function matchPosts(title: string, brand: string, posts: { mediaUrl: stri
   if (words.length === 0) return [];
   return posts
     .filter((p) => p.mediaType !== "VIDEO" && p.mediaUrl && p.caption)
-    .filter((p) => words.some((w) => (p.caption ?? "").toLowerCase().includes(w)))
+    // At least half of the title's distinctive words: one shared word is often a coincidence.
+    .filter((p) => words.filter((w) => (p.caption ?? "").toLowerCase().includes(w)).length >= Math.ceil(words.length / 2))
     .map((p) => p.mediaUrl as string)
     .slice(0, MAX_POSTS);
 }
