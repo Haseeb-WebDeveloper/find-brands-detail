@@ -39,6 +39,8 @@ export type BrandDetail = {
   cover: FieldSection;
   pages: { url: string; source: string; archivedAt: string | null; facts: PageFacts }[];
   campaigns: CampaignCard[];
+  /** The reviewer's brand text (spec §6 brand_text); empty strings until typed. */
+  text: { description: string; tier: string; aesthetic: string; industry: string; regions: string };
   log: LogLine[];
 };
 
@@ -53,6 +55,7 @@ export async function getBrandDetail(_scope: TeamScope, id: string): Promise<Bra
       pages: { orderBy: { fetchedAt: "asc" } },
       logs: { orderBy: { createdAt: "desc" } },
       campaigns: { orderBy: { position: "asc" }, include: { images: true } },
+      text: true,
     },
   });
   if (!brand) return null;
@@ -97,6 +100,13 @@ export async function getBrandDetail(_scope: TeamScope, id: string): Promise<Bra
         images: c.images.map((i) => ({ id: i.id, url: i.url, sourceKind: i.sourceKind, width: i.width, height: i.height, score: i.score, reason: i.reason, selected: i.selected })),
       };
     }),
+    text: {
+      description: brand.text?.description ?? "",
+      tier: brand.text?.tier ?? "",
+      aesthetic: brand.text?.aesthetic ?? "",
+      industry: brand.text?.industry ?? "",
+      regions: brand.text?.regions ?? "",
+    },
     log: brand.logs.map((l) => ({ id: l.id, brandId: l.brandId, brandName: brand.name, level: l.level as LogLevel, message: l.message, at: l.createdAt.toISOString() })),
   };
 }
