@@ -18,6 +18,17 @@ describe("parseCampaignsAnswer", () => {
     expect(r).toHaveLength(8);
   });
 
+  it("skips sales and promotions, whatever the model calls them", () => {
+    const text = JSON.stringify({
+      campaigns: [
+        { title: "Snail Mucin Essence (Ongoing Promotion)", date: null, sources: ["https://a.com"] },
+        { title: "Black Friday Sale", date: null, sources: ["https://a.com"] },
+        { title: "Urea Intensive Collection Launch", date: "2026-10", sources: ["https://a.com"] },
+      ],
+    });
+    expect(parseCampaignsAnswer(text).map((c) => c.title)).toEqual(["Urea Intensive Collection Launch"]);
+  });
+
   it("is empty for an answer without JSON", () => {
     expect(parseCampaignsAnswer("Sorry, nothing found.")).toEqual([]);
   });
