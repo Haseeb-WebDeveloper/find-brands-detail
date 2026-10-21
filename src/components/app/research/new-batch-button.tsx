@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { startBatch } from "@/lib/batches/actions";
 
 /** "New batch": paste brands in a dialog; research starts and the batch's page opens, live. */
-export function NewBatchButton() {
+export function NewBatchButton({ aiOn = true }: { aiOn?: boolean }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
@@ -34,7 +34,11 @@ export function NewBatchButton() {
         open={open}
         onOpenChange={(next) => !pending && setOpen(next)}
         title="New batch"
-        detail="One brand per line. Add its website after a comma if you know it."
+        detail={
+          aiOn
+            ? "One brand per line. Add its website after a comma if you know it."
+            : "One brand per line, with its website after a comma. No AI key is set up, so websites and campaigns can't be searched for."
+        }
         confirm={pending ? "Starting…" : "Start research"}
         busy={pending || text.trim() === ""}
         closeOnConfirm={false}

@@ -41,7 +41,7 @@ export function PageHeader({
 
   return (
     <>
-    <div className="sticky top-0 z-20 -mx-4 mb-2 flex h-16 items-center gap-3 px-4 md:-mx-8 md:px-8">
+    <div className="sticky top-(--app-bar,0px) z-20 -mx-4 mb-2 flex h-16 items-center gap-3 px-4 md:-mx-8 md:px-8">
       <motion.div
         aria-hidden
         style={{ opacity: edge }}

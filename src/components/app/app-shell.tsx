@@ -28,7 +28,7 @@ export type ShellNav = {
 };
 
 /** The page column's width, shared by the bar and `AppPage` so their edges line up. */
-export const COLUMN = "mx-auto w-full max-w-6xl px-4 sm:px-8";
+export const COLUMN = "mx-auto w-full max-w-7xl px-4 sm:px-8";
 
 function Account({ nav }: { nav: Promise<ShellNav | null> }) {
   const data = use(nav);
@@ -57,18 +57,20 @@ function TokenBanner({ nav }: { nav: Promise<ShellNav | null> }) {
 export function AppShell({ nav, children }: { nav: Promise<ShellNav | null>; children: ReactNode }) {
   return (
     /**
-     * THE DOCUMENT DOES NOT SCROLL. The frame is fixed-height and each page (`AppPage`) is the
-     * scroll region, so the bar stays put. `min-h-0` on every flex child that contains one.
+     * THE PAGE SCROLLS, IN THE WINDOW (owner, 2026-10-21: "the scrollbar should show on the page
+     * itself"). No region scrolls on its own; the bar is sticky, and page headers stick below it
+     * (`--app-bar`).
      */
     <DashboardTheme>
-      <DesignRoot data-surface="app" className="flex h-dvh flex-col overflow-hidden bg-(--ds-ground) text-foreground">
+      <DesignRoot data-surface="app" className="flex min-h-dvh flex-col bg-(--ds-ground) text-foreground [--app-bar:3.5rem]">
         <div aria-hidden className="window-mesh pointer-events-none fixed inset-0" />
         <ToastProvider>
-          <div className="relative z-10 flex min-h-0 flex-1 flex-col">
+          <div className="relative z-10 flex flex-1 flex-col">
             <Suspense fallback={null}>
               <TokenBanner nav={nav} />
             </Suspense>
-            <header className={`${COLUMN} flex h-14 shrink-0 items-center gap-3`}>
+            <div className="sticky top-0 z-30 bg-(--ds-ground)/80 backdrop-blur-xl">
+            <header className={`${COLUMN} flex h-(--app-bar) shrink-0 items-center gap-3`}>
               <Link href="/" className="flex items-center gap-2 text-headline text-label">
                 <span aria-hidden className="size-6 rounded-lg bg-linear-to-br from-violet-500 to-sky-400" />
                 Brand Enrich
@@ -79,7 +81,8 @@ export function AppShell({ nav, children }: { nav: Promise<ShellNav | null>; chi
                 </Suspense>
               </div>
             </header>
-            <main className="min-h-0 flex-1">{children}</main>
+            </div>
+            <main className="flex-1">{children}</main>
           </div>
         </ToastProvider>
       </DesignRoot>

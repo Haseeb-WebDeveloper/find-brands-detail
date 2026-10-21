@@ -1,6 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
-import { askPlain, askWithSearch } from "@/lib/ai/models";
+import { aiAvailable, askPlain, askWithSearch } from "@/lib/ai/models";
 import { checkImageUrl } from "@/lib/images/check-image";
 import { fetchPage } from "@/lib/website/fetch-page";
 import { researchCampaigns } from "@/lib/campaigns/research";
@@ -15,6 +15,11 @@ type IgEvidence = { recentMedia?: { mediaType: string; mediaUrl: string | null; 
  * replaces the brand's proposed campaigns.
  */
 export async function runCampaignsStep(brandId: string, log: ResearchLog): Promise<void> {
+  // Without a model there is nothing to search with; the campaigns already here (added by hand) stay.
+  if (!aiAvailable()) {
+    await log("No AI key is set up, so campaigns weren't searched. Add them by hand on the brand page.", "warn");
+    return;
+  }
   const [{ name, brandDomains }, selections] = await Promise.all([
     loadResearchPages(brandId),
     prisma.selection.findMany({ where: { brandId, field: { in: ["website", "instagram"] } }, include: { candidate: true } }),

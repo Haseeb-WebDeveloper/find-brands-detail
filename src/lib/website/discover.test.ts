@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseSitesAnswer } from "@/lib/website/discover";
+import { findOfficialSites, parseSitesAnswer } from "@/lib/website/discover";
 
 describe("parseSitesAnswer", () => {
   it("reads the JSON object out of a prose answer", () => {
@@ -19,5 +19,21 @@ describe("parseSitesAnswer", () => {
   it("is empty for unreadable answers", () => {
     expect(parseSitesAnswer("I could not find it.")).toEqual([]);
     expect(parseSitesAnswer('{"sites": "nope"}')).toEqual([]);
+  });
+});
+
+describe("findOfficialSites without an AI key", () => {
+  it("says so and returns nothing, at once", async () => {
+    const saved = { groq: process.env.GROQ_API_KEY, gemini: process.env.GOOGLE_GENERATIVE_AI_API_KEY };
+    delete process.env.GROQ_API_KEY;
+    delete process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+    try {
+      const lines: string[] = [];
+      expect(await findOfficialSites("numbuzin", async (m) => void lines.push(m))).toEqual([]);
+      expect(lines[0]).toMatch(/^No AI key is set up, so no website was searched/);
+    } finally {
+      if (saved.groq) process.env.GROQ_API_KEY = saved.groq;
+      if (saved.gemini) process.env.GOOGLE_GENERATIVE_AI_API_KEY = saved.gemini;
+    }
   });
 });

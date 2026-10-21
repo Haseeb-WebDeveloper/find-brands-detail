@@ -2,6 +2,14 @@ import "server-only";
 import { noLog, type ResearchLog } from "@/lib/research/log-types";
 
 type Effort = "low" | "medium";
+
+/**
+ * Whether any model is set up. Only finding a website (when none is given) and finding and describing
+ * campaigns need one; every other step works without (spec 2026-10-21 §3).
+ */
+export function aiAvailable(): boolean {
+  return Boolean(process.env.GROQ_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY);
+}
 const TIMEOUT_MS = 120_000;
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
 const isQuota = (error: unknown) => /quota|rate.?limit|429/i.test(message(error));

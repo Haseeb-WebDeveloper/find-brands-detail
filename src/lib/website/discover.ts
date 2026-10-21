@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { askWithSearch } from "@/lib/ai/models";
+import { aiAvailable, askWithSearch } from "@/lib/ai/models";
 import { noLog, type ResearchLog } from "@/lib/research/log-types";
 
 export type SiteSuggestion = { url: string; region: "global" | "us" | "kr" | "other" };
@@ -43,6 +43,10 @@ const PROMPT = (brand: string) =>
 
 /** Never throws: no key or every model failing means no suggestions, and the brand goes to review. */
 export async function findOfficialSites(brand: string, log: ResearchLog = noLog): Promise<SiteSuggestion[]> {
+  if (!aiAvailable()) {
+    await log("No AI key is set up, so no website was searched. Give the brand as \"Name, website\" in the batch, or type the website on the brand page.", "warn");
+    return [];
+  }
   const text = await askWithSearch(PROMPT(brand), { what: `${brand}'s official sites`, effort: "medium", log, accept: (t) => parseSitesAnswer(t).length > 0 });
   return text ? parseSitesAnswer(text) : [];
 }

@@ -14,6 +14,8 @@ export type BatchListItem = {
   done: number;
   researching: number;
   needsReview: number;
+  approved: number;
+  exported: number;
   failed: number;
   /** The first few brand names, for the card. */
   names: string[];
@@ -58,6 +60,8 @@ export async function listBatches(_scope: TeamScope): Promise<BatchListItem[]> {
     done: b.brands.filter((x) => FINISHED.includes(x.status)).length,
     researching: b.brands.filter((x) => x.status === "researching").length,
     needsReview: b.brands.filter((x) => x.status === "needs_review").length,
+    approved: b.brands.filter((x) => x.status === "approved").length,
+    exported: b.brands.filter((x) => x.status === "exported").length,
     failed: b.brands.filter((x) => x.error).length,
     names: b.brands.slice(0, 6).map((x) => x.name),
   }));

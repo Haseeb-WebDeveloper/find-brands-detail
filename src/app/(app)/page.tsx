@@ -5,6 +5,7 @@ import { PageHeader } from "@/design/page-header";
 import { Empty } from "@/design/empty";
 import { sayAgo } from "@/design/ago";
 import { requireMember, scopeCan } from "@/lib/auth/scope";
+import { aiAvailable } from "@/lib/ai/models";
 import { listBatches, type BatchListItem } from "@/lib/batches/scoped";
 import { batchTopic } from "@/lib/realtime/channels";
 import { AppPage } from "@/components/app/app-page";
@@ -19,10 +20,12 @@ function statusLine(b: BatchListItem): string {
   const parts = [
     b.researching > 0 ? `${b.researching} researching` : null,
     b.brandCount - b.done - b.researching > 0 ? `${b.brandCount - b.done - b.researching} waiting` : null,
-    b.needsReview > 0 ? `${b.needsReview} ready for review` : null,
+    b.needsReview > 0 ? `${b.needsReview} to review` : null,
+    b.approved > 0 ? `${b.approved} approved` : null,
+    b.exported > 0 ? `${b.exported} exported` : null,
     b.failed > 0 ? `${b.failed} stopped` : null,
   ].filter(Boolean);
-  return parts.length > 0 ? parts.join(" · ") : "All reviewed";
+  return parts.join(" · ");
 }
 
 function BatchCard({ batch }: { batch: BatchListItem }) {
@@ -30,10 +33,10 @@ function BatchCard({ batch }: { batch: BatchListItem }) {
   return (
     <Link
       href={`/batches/${batch.id}`}
-      className="group flex flex-col gap-3 rounded-card bg-surface p-4 transition-shadow hover:shadow-md focus-visible:outline-2 focus-visible:outline-tint"
+      className="group flex flex-col gap-3 rounded-card bg-surface p-5 transition-shadow hover:shadow-md focus-visible:outline-2 focus-visible:outline-tint"
     >
       <div className="flex items-baseline justify-between gap-3">
-        <span className="text-headline text-label">
+        <span className="text-title-3 text-label">
           {batch.brandCount} brand{batch.brandCount === 1 ? "" : "s"}
         </span>
         <span className="shrink-0 text-footnote text-label-secondary">{sayAgo(batch.createdAt)}</span>
@@ -64,7 +67,7 @@ async function Batches() {
       {batches.filter((b) => b.done < b.brandCount).map((b) => (
         <LiveRefresh key={b.id} topic={batchTopic(b.id)} />
       ))}
-      <div className="grid gap-3 pb-10 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {batches.map((b) => (
           <BatchCard key={b.id} batch={b} />
         ))}
@@ -75,7 +78,7 @@ async function Batches() {
 
 async function Actions() {
   const scope = await requireMember();
-  return scopeCan(scope, "batches:write") ? <NewBatchButton /> : null;
+  return scopeCan(scope, "batches:write") ? <NewBatchButton aiOn={aiAvailable()} /> : null;
 }
 
 export default function HomePage() {
