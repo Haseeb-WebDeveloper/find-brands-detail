@@ -52,8 +52,8 @@ async function Brand({ params }: { params: Promise<{ id: string }> }) {
       <div className="mx-auto flex max-w-4xl flex-col gap-8">
         {brand.error ? <p className="rounded-card bg-surface px-4 py-3 text-callout text-system-red">{brand.error}</p> : null}
         <FieldsCard brand={brand} canEdit={canEdit} />
-        <CampaignEditor brandId={brand.id} campaigns={brand.campaigns} canEdit={canEdit} />
         <BrandTextForm key={JSON.stringify(brand.text)} brandId={brand.id} initial={brand.text} canEdit={canEdit} />
+        <CampaignEditor brandId={brand.id} campaigns={brand.campaigns} canEdit={canEdit} />
         <div className="flex flex-col gap-3">
           <ResearchLog lines={brand.log} live={researching} defaultOpen={researching} />
           {scopeCan(scope, "batches:write") && !researching ? (
