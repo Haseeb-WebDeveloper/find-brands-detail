@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { AppPage } from "@/components/app/app-page";
 import { ResearchLog } from "@/components/app/research/research-log";
+import { CampaignCards } from "@/components/app/research/campaign-cards";
 import { PageHeader } from "@/design/page-header";
 import { ListGroup, ListRow, Pill } from "@/design/list";
 import { requireMember, scopeCan } from "@/lib/auth/scope";
@@ -188,6 +189,11 @@ async function Brand({ params }: { params: Promise<{ id: string }> }) {
           )}
         </section>
       ))}
+
+      <section className="flex flex-col gap-2">
+        <h2 className="text-headline text-label">Campaigns</h2>
+        <CampaignCards campaigns={brand.campaigns} />
+      </section>
 
       <section className="flex flex-col gap-2">
         <h2 className="text-headline text-label">Pages read</h2>

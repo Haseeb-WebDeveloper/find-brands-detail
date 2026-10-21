@@ -16,4 +16,11 @@ export async function runScoreStep(brandId: string, log: ResearchLog): Promise<v
   const summary = reviewSummary(fields);
   await prisma.brand.update({ where: { id: brandId }, data: { reviewCount: summary.count } });
   await log(summary.message, summary.level);
+
+  // Every campaign is reviewed (spec §7); the DB importer needs at least 3.
+  const campaigns = await prisma.campaign.count({ where: { brandId } });
+  await log(
+    campaigns >= 3 ? `${campaigns} campaigns to review.` : `${campaigns} campaign${campaigns === 1 ? "" : "s"} found; the DB needs at least 3, so add more during review.`,
+    campaigns >= 3 ? "info" : "warn",
+  );
 }

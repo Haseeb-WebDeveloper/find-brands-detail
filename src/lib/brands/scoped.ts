@@ -1,10 +1,23 @@
 import "server-only";
-import type { BrandStatus, CandidateScore } from "@prisma/client";
+import type { BrandStatus, CampaignStatus, CandidateScore, ImageSourceKind } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { TeamScope } from "@/lib/auth/scope";
 import type { PageFacts } from "@/lib/website/extract";
 import type { LogLine } from "@/lib/batches/scoped";
 import type { LogLevel } from "@/lib/research/log-types";
+
+export type CampaignCard = {
+  id: string;
+  position: number;
+  title: string;
+  description: string;
+  date: string | null;
+  /** Why the description needs a closer look, when it does. */
+  note: string | null;
+  sources: string[];
+  status: CampaignStatus;
+  images: { id: string; url: string; sourceKind: ImageSourceKind; width: number | null; height: number | null; score: CandidateScore; reason: string; selected: boolean }[];
+};
 
 type FieldSection = {
   selectedCandidateId: string | null;
@@ -25,6 +38,7 @@ export type BrandDetail = {
   logo: FieldSection;
   cover: FieldSection;
   pages: { url: string; source: string; archivedAt: string | null; facts: PageFacts }[];
+  campaigns: CampaignCard[];
   log: LogLine[];
 };
 
@@ -38,6 +52,7 @@ export async function getBrandDetail(_scope: TeamScope, id: string): Promise<Bra
       selections: { where: { field: { in: [...FIELDS] } } },
       pages: { orderBy: { fetchedAt: "asc" } },
       logs: { orderBy: { createdAt: "desc" } },
+      campaigns: { orderBy: { position: "asc" }, include: { images: true } },
     },
   });
   if (!brand) return null;
@@ -68,6 +83,20 @@ export async function getBrandDetail(_scope: TeamScope, id: string): Promise<Bra
     logo: section("logo"),
     cover: section("cover"),
     pages: brand.pages.map((p) => ({ url: p.url, source: p.source, archivedAt: p.archivedAt, facts: p.facts as PageFacts })),
+    campaigns: brand.campaigns.map((c) => {
+      const src = (c.sourceUrls ?? {}) as { date?: string | null; note?: string | null; urls?: string[] };
+      return {
+        id: c.id,
+        position: c.position,
+        title: c.title,
+        description: c.description,
+        date: src.date ?? null,
+        note: src.note ?? null,
+        sources: src.urls ?? [],
+        status: c.status,
+        images: c.images.map((i) => ({ id: i.id, url: i.url, sourceKind: i.sourceKind, width: i.width, height: i.height, score: i.score, reason: i.reason, selected: i.selected })),
+      };
+    }),
     log: brand.logs.map((l) => ({ id: l.id, brandId: l.brandId, brandName: brand.name, level: l.level as LogLevel, message: l.message, at: l.createdAt.toISOString() })),
   };
 }
