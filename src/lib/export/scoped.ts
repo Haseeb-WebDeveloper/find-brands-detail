@@ -1,15 +1,14 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import type { TeamScope } from "@/lib/auth/scope";
+import type { ExportGroup } from "@/lib/export/groups";
 
-export type ExportableBrand = { id: string; name: string; batchId: string; status: "approved" | "exported"; updatedAt: string };
-
-/** Approved brands, and exported ones (they can be exported again). */
-export async function listExportable(_scope: TeamScope): Promise<ExportableBrand[]> {
-  const brands = await prisma.brand.findMany({
-    where: { status: { in: ["approved", "exported"] } },
-    orderBy: [{ status: "asc" }, { updatedAt: "desc" }],
-    select: { id: true, name: true, batchId: true, status: true, updatedAt: true },
+/** Every batch with a finished brand, newest first, with its brands: the export screen picks from these. */
+export async function listExportGroups(_scope: TeamScope): Promise<ExportGroup[]> {
+  const batches = await prisma.batch.findMany({
+    where: { brands: { some: { status: { in: ["needs_review", "approved", "exported"] } } } },
+    orderBy: { createdAt: "desc" },
+    select: { id: true, createdAt: true, brands: { orderBy: { createdAt: "asc" }, select: { id: true, name: true, status: true } } },
   });
-  return brands.map((b) => ({ ...b, status: b.status as ExportableBrand["status"], updatedAt: b.updatedAt.toISOString() }));
+  return batches.map((b) => ({ id: b.id, createdAt: b.createdAt.toISOString(), brands: b.brands }));
 }

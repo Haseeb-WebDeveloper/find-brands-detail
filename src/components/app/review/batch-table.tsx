@@ -5,6 +5,7 @@ import { useState } from "react";
 import { DataTable, type TableColumn } from "@/design/table";
 import { Segmented } from "@/design/segmented";
 import { Pill } from "@/design/list";
+import { Button } from "@/design/button";
 import { cn } from "@/design/cn";
 import type { BrandRow } from "@/lib/batches/scoped";
 import { progressText, progressTone } from "@/lib/brands/progress";
@@ -20,7 +21,7 @@ function Cell({ score }: { score: BrandRow["fields"][ReviewField] }) {
   return (
     <span className="flex items-center gap-1.5" title={WORD[key]}>
       <span aria-hidden className={cn("size-2.5 rounded-full", DOT[key])} />
-      <span className="text-footnote text-label-secondary">{WORD[key]}</span>
+      <span className="text-subhead text-label-secondary">{WORD[key]}</span>
     </span>
   );
 }
@@ -28,7 +29,7 @@ function Cell({ score }: { score: BrandRow["fields"][ReviewField] }) {
 const field = (key: ReviewField, label: string): TableColumn<BrandRow> => ({
   key,
   label,
-  width: 120,
+  width: 132,
   cell: (b) => (b.status === "queued" || b.status === "researching" ? <span className="text-footnote text-label-tertiary">—</span> : <Cell score={b.fields[key]} />),
 });
 
@@ -54,12 +55,23 @@ const COLUMNS: TableColumn<BrandRow>[] = [
     label: "Campaigns",
     width: 120,
     cell: (b) => (
-      <span className={cn("text-footnote tabular-nums", b.campaigns.approved < 3 ? "text-system-orange" : "text-label-secondary")}>
+      <span className={cn("text-subhead tabular-nums", b.campaigns.approved < 3 ? "text-system-orange" : "text-label-secondary")}>
         {b.campaigns.approved}/{b.campaigns.total} approved
       </span>
     ),
   },
-  { key: "status", label: "Status", width: 220, cell: (b) => <Pill tone={progressTone(b)}>{progressText(b)}</Pill> },
+  { key: "status", label: "Status", width: 240, cell: (b) => <Pill tone={progressTone(b)}>{progressText(b)}</Pill> },
+  {
+    key: "open",
+    label: "",
+    width: 110,
+    align: "end",
+    cell: (b) => (
+      <Button kind={b.status === "needs_review" ? "filled" : "gray"} size="sm" href={`/brands/${b.id}`}>
+        {b.status === "needs_review" ? "Review" : "Open"}
+      </Button>
+    ),
+  },
 ];
 
 /** Spec §8 screen 4: one row per brand, a coloured cell per field, filters for what needs a person. */

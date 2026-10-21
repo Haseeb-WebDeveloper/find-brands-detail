@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { PageHeader } from "@/design/page-header";
+import { Button } from "@/design/button";
 import { Pill } from "@/design/list";
 import { sayAgo } from "@/design/ago";
 import { requireMember } from "@/lib/auth/scope";
@@ -54,10 +55,19 @@ async function Batch({ params }: { params: Promise<{ id: string }> }) {
       <PageHeader
         title={`${batch.brands.length} brand${batch.brands.length === 1 ? "" : "s"}`}
         back={{ href: "/", label: "Batches" }}
-        actions={<span className="text-callout text-label-secondary">Started {sayAgo(batch.createdAt)} · {done}/{batch.brands.length} done</span>}
+        actions={
+          <div className="flex items-center gap-3">
+            <span className="hidden text-callout text-label-secondary sm:inline">
+              Started {sayAgo(batch.createdAt)} · {done}/{batch.brands.length} done
+            </span>
+            <Button kind="gray" icon="download" href={`/export?batch=${batch.id}`}>
+              Export this batch
+            </Button>
+          </div>
+        }
       />
       <LiveRefresh topic={batchTopic(batch.id)} />
-      <div className="flex flex-col gap-8 pb-10">
+      <div className="flex flex-col gap-10">
         {running ? (
           // While research runs, what each unfinished brand is doing; the table has their results.
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -69,7 +79,7 @@ async function Batch({ params }: { params: Promise<{ id: string }> }) {
           </div>
         ) : null}
         <BatchTable brands={batch.brands} />
-        <ResearchLog lines={batch.log} showBrand live={running} />
+        <ResearchLog lines={batch.log} showBrand live={running} defaultOpen={running} />
       </div>
     </>
   );
