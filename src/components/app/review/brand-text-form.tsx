@@ -6,6 +6,8 @@ import { Segmented } from "@/design/segmented";
 import { useToast } from "@/design/toast";
 import { cn } from "@/design/cn";
 import { saveBrandText } from "@/lib/review/actions";
+import { AESTHETICS, INDUSTRIES, REGIONS } from "@/lib/details/vocab";
+import { TagInput } from "@/components/app/review/tag-input";
 
 type Text = { description: string; tier: string; aesthetic: string; industry: string; regions: string };
 type Key = keyof Text;
@@ -16,6 +18,9 @@ const TIERS = [
   { value: "masstige", label: "Masstige" },
 ] as const;
 const LISTS: Key[] = ["aesthetic", "industry", "regions"];
+/** The DB's own words for each list (DB-mvp data); only aesthetics may grow from here. */
+const VOCAB = { aesthetic: AESTHETICS, industry: INDUSTRIES, regions: REGIONS } as const;
+const words = (list: string) => list.split(/[|,]/).map((w) => w.trim()).filter(Boolean);
 const LABEL: Record<Key, string> = { description: "Description", tier: "Tier", aesthetic: "Aesthetic", industry: "Industry", regions: "Regions" };
 
 /** Stored pipe-separated (the importer's form); shown and typed comma-separated. */
@@ -97,18 +102,20 @@ export function BrandTextForm({ brandId, initial, canEdit }: { brandId: string; 
             />
           </div>,
         )}
-        {LISTS.map((key) =>
+        {(["aesthetic", "industry", "regions"] as const).map((key) =>
           row(
             key,
-            <input
-              aria-label={LABEL[key]}
-              value={text[key]}
-              onChange={set(key)}
-              onBlur={() => save(text)}
-              onKeyDown={onEnter}
+            <TagInput
+              label={LABEL[key]}
+              value={words(text[key])}
+              options={VOCAB[key]}
+              allowNew={key === "aesthetic"}
               disabled={!canEdit}
-              placeholder="—"
-              className={FIELD}
+              onChange={(list) => {
+                const next = { ...text, [key]: list.join(", ") };
+                setText(next);
+                save(next);
+              }}
             />,
           ),
         )}
