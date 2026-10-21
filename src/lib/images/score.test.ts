@@ -64,3 +64,17 @@ describe("chooseImage", () => {
     expect(chooseImage([{ candidate: tiny, verdict: scoreImage(tiny, NOW) }])).toBeNull();
   });
 });
+
+describe("campaign images", () => {
+  it("labels a third-party page's image for review", () => {
+    const c = cand({ slot: "campaign", w: 1600, h: 900, source: { kind: "third_party", label: "rollingstone.com" } });
+    expect(scoreImage(c, NOW)).toEqual({ score: "review", reason: "1600×900 from rollingstone.com, a third-party page." });
+  });
+
+  it("proves a brand page's image and prefers the 200:236 shape", () => {
+    const tall = cand({ slot: "campaign", url: "tall", w: 1000, h: 1180 });
+    const wide = cand({ slot: "campaign", url: "wide", w: 1600, h: 900 });
+    expect(scoreImage(tall, NOW).score).toBe("proven");
+    expect(chooseImage([wide, tall].map((c) => ({ candidate: c, verdict: scoreImage(c, NOW) })))?.url).toBe("tall");
+  });
+});
