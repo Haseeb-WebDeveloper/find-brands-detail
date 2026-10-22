@@ -6,7 +6,11 @@
 
 export const TIERS = ["luxury", "premium", "masstige"] as const;
 
-export const INDUSTRIES = ["apparel", "accessories", "makeup", "fragrances", "skincare", "haircare", "sportswear", "bodycare", "beauty"] as const;
+/**
+ * Exactly the industries the Digital Beauty site filters brands by (production /web/filters/brands,
+ * 2026-10-22). Words outside it ("bodycare", "beauty") made industries the site doesn't offer.
+ */
+export const INDUSTRIES = ["apparel", "accessories", "footwear", "jewelry", "makeup", "fragrances", "skincare", "haircare", "sportswear"] as const;
 
 /** The DB uses "global" for most brands; the rest name where a brand mainly sells. */
 export const REGIONS = ["global", "north america", "europe", "asia", "middle east", "latin america"] as const;
