@@ -7,6 +7,7 @@ import { campaignsPrompt, parseCampaignsAnswer } from "@/lib/campaigns/find";
 import { readCampaignPage } from "@/lib/campaigns/page";
 import { distinctiveWords, matchPosts, pageMentions } from "@/lib/campaigns/posts";
 import type { IgPost } from "@/lib/instagram/history";
+import { rankHits, type ImageHit } from "@/lib/images/search";
 import { cutToSentence, DESCRIPTION_MAX, describePrompt, parseDescriptions, shortenPrompt } from "@/lib/campaigns/describe";
 import { noLog, type ResearchLog } from "@/lib/research/log-types";
 
@@ -20,6 +21,8 @@ export type CampaignsDeps = {
   checkImage(url: string): Promise<ImageCheckResult>;
   /** The brand's Instagram posts back to `since` (null: the latest ones). */
   loadPosts(since: Date | null): Promise<{ posts: IgPost[]; error: string | null }>;
+  /** Free image search (lib/images/search.ts), for a campaign the brand's own images don't cover. */
+  searchImages(query: string): Promise<{ hits: ImageHit[]; engine: string | null }>;
 };
 
 export type ResearchedCampaign = {
@@ -35,6 +38,8 @@ export type ResearchedCampaign = {
 
 /** Images checked per campaign: a download each. */
 const MAX_CHECKS = 8;
+/** Image-search results checked per campaign: the best few by the rules in rankHits. */
+const SEARCH_CHECKS = 4;
 /** A campaign date: "2024-03", or "2024" (read as its January). */
 const DATE = /^(\d{4})(?:-(\d{2}))?$/;
 
@@ -72,7 +77,12 @@ export async function researchCampaigns(input: CampaignsInput, deps: CampaignsDe
   }
 
   const owned = (url: string) => {
-    const h = new URL(url).hostname;
+    let h: string;
+    try {
+      h = new URL(url).hostname;
+    } catch {
+      return false;
+    }
     return input.brandDomains.includes(registrableDomain(h)) || domainMatchesBrand(h, input.brand);
   };
   const kept: (Omit<ResearchedCampaign, "description" | "descriptionNote"> & { text: string })[] = [];
@@ -94,18 +104,39 @@ export async function researchCampaigns(input: CampaignsInput, deps: CampaignsDe
       continue;
     }
 
-    // Brand-owned images first (spec §3): the brand's pages, then its Instagram posts (its own
-    // campaign visuals, in the portrait shape the DB shows), then third-party pages.
-    const leads: { url: string; source: ImageSource }[] = [];
-    for (const p of pages.filter((x) => owned(x.url))) for (const u of p.images) leads.push({ url: u, source: { kind: "site", label: host(p.url) } });
-    for (const u of fromPosts) leads.push({ url: u, source: { kind: "instagram", label: `a @${input.instagram?.handle} post` } });
-    for (const p of pages.filter((x) => !owned(x.url))) for (const u of p.images) leads.push({ url: u, source: { kind: "third_party", label: host(p.url) } });
     const images: ResearchedCampaign["images"] = [];
+    const checked = new Set<string>();
     // One at a time: politeness to each host (Global Constraints).
-    for (const lead of leads.filter((l, i, all) => all.findIndex((x) => x.url === l.url) === i).slice(0, MAX_CHECKS)) {
-      const check = await deps.checkImage(lead.url);
-      const candidate: ImageCandidate = { slot: "campaign", url: lead.url, source: lead.source, check, expiresAt: linkExpiry(lead.url) };
-      images.push({ candidate, verdict: scoreImage(candidate, now) });
+    const check = async (leads: { url: string; source: ImageSource }[], max: number) => {
+      for (const lead of leads.filter((l) => !checked.has(l.url)).slice(0, max)) {
+        checked.add(lead.url);
+        const result = await deps.checkImage(lead.url);
+        const candidate: ImageCandidate = { slot: "campaign", url: lead.url, source: lead.source, check: result, expiresAt: linkExpiry(lead.url) };
+        images.push({ candidate, verdict: scoreImage(candidate, now) });
+      }
+    };
+
+    // Brand-owned images first (spec §3): the brand's pages, then its Instagram posts (its own
+    // campaign visuals, in the portrait shape the DB shows).
+    const brandLeads: { url: string; source: ImageSource }[] = [];
+    for (const p of pages.filter((x) => owned(x.url))) for (const u of p.images) brandLeads.push({ url: u, source: { kind: "site", label: host(p.url) } });
+    for (const u of fromPosts) brandLeads.push({ url: u, source: { kind: "instagram", label: `a @${input.instagram?.handle} post` } });
+    await check(brandLeads, MAX_CHECKS);
+
+    // Nothing usable from the brand: an image search (free, no AI), then the press pages' images.
+    if (!images.some((i) => i.verdict.score !== "rejected")) {
+      const words = distinctiveWords(c.title, input.brand);
+      const { hits, engine } = await deps.searchImages(`${input.brand} ${c.title} campaign`);
+      const ranked = rankHits(hits, words, owned, SEARCH_CHECKS);
+      await log(
+        engine
+          ? `Searched ${engine} images for "${c.title}": ${ranked.length} of ${hits.length} result${hits.length === 1 ? "" : "s"} name it.`
+          : `Couldn't search images for "${c.title}".`,
+        engine ? "info" : "warn",
+      );
+      const otherLeads: { url: string; source: ImageSource }[] = ranked.map((h) => ({ url: h.url, source: { kind: owned(h.page) ? "site" : "third_party", label: host(h.page) } }));
+      for (const p of pages.filter((x) => !owned(x.url))) for (const u of p.images) otherLeads.push({ url: u, source: { kind: "third_party", label: host(p.url) } });
+      await check(otherLeads, MAX_CHECKS);
     }
     const chosen = chooseImage(images);
     const verdict = images.find((i) => i.candidate === chosen)?.verdict;

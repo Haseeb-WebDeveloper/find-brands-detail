@@ -7,6 +7,7 @@ import { researchCampaigns } from "@/lib/campaigns/research";
 import { parseCampaignsAnswer } from "@/lib/campaigns/find";
 import { loadResearchPages } from "@/lib/research/pages";
 import { fetchPostHistory, type IgPost } from "@/lib/instagram/history";
+import { searchImages } from "@/lib/images/search";
 import type { ResearchLog } from "@/lib/research/log-types";
 
 type IgEvidence = { recentMedia?: { mediaType: string; mediaUrl: string | null; caption: string | null; permalink?: string; timestamp?: string }[] };
@@ -59,6 +60,7 @@ export async function runCampaignsStep(brandId: string, log: ResearchLog): Promi
         const history = await fetchPostHistory(ig.value, since);
         return history.posts.length > 0 ? history : { posts: recent, error: history.error };
       },
+      searchImages,
     },
     log,
   );

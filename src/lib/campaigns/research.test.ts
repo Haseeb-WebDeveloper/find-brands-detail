@@ -33,6 +33,13 @@ function deps() {
       posts: [{ mediaType: "IMAGE", images: ["https://scontent.cdninstagram.com/tour.jpg"], caption: "The First Light world tour", timestamp: "2025-12-02T10:00:00+0000", permalink: "" }],
       error: null as string | null,
     })),
+    searchImages: vi.fn(async (_query: string) => ({
+      hits: [
+        { url: "https://cdn.pinimg.com/unrelated.jpg", page: "https://pinterest.com/x", title: "Skincare moodboard", width: 1200, height: 1500 },
+        { url: "https://mag.com/the-first-light-tour.jpg", page: "https://mag.com/tirtir-tour", title: "TIRTIR's world tour, The First Light", width: 1080, height: 1350 },
+      ],
+      engine: "DuckDuckGo" as string | null,
+    })),
   } satisfies CampaignsDeps;
 }
 
@@ -48,7 +55,8 @@ describe("researchCampaigns", () => {
     expect(v.sources).toEqual(["https://tirtir.global/blogs/press/v", "https://www.rollingstone.com/v"]);
     expect(v.description).toBe("V fronts TIRTIR's first global campaign.");
     expect(v.chosen?.url).toBe("https://tirtir.global/v.jpg");
-    expect(v.images.find((i) => i.candidate.url === "https://rs.com/v.jpg")?.verdict.score).toBe("review");
+    // The brand's own page had a usable image, so the press page's images aren't even downloaded.
+    expect(v.images.some((i) => i.candidate.url === "https://rs.com/v.jpg")).toBe(false);
     // The tour page has no image of its own; the matching Instagram post supplies one.
     expect(r[0].chosen?.source.kind).toBe("instagram");
     expect(r[0].sources).toEqual(["https://tirtir.global/tour"]);
@@ -86,6 +94,21 @@ describe("researchCampaigns", () => {
     await researchCampaigns(input, d, undefined, NOW);
     // Oldest campaign: "Invented", 2025-01 → from 2024-12-01.
     expect(d.loadPosts).toHaveBeenCalledWith(new Date("2024-12-01T00:00:00Z"));
+  });
+
+  it("searches images only when the brand's own pages and posts give nothing usable", async () => {
+    const d = deps();
+    await researchCampaigns(input, d, undefined, NOW);
+    // V&YOU has its own page's image, World Tour its Instagram post: no search.
+    expect(d.searchImages).not.toHaveBeenCalled();
+
+    const none = deps();
+    none.loadPosts.mockResolvedValue({ posts: [], error: null });
+    const r = await researchCampaigns(input, none, undefined, NOW);
+    expect(none.searchImages).toHaveBeenCalledWith("TIRTIR World Tour; The First Light campaign");
+    // The result naming the campaign is used; the unrelated one isn't even checked.
+    expect(r.find((c) => c.title.startsWith("World"))?.chosen?.url).toBe("https://mag.com/the-first-light-tour.jpg");
+    expect(none.checkImage).not.toHaveBeenCalledWith("https://cdn.pinimg.com/unrelated.jpg");
   });
 
   it("returns nothing when the search finds nothing", async () => {
