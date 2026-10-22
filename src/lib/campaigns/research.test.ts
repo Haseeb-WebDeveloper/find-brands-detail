@@ -29,15 +29,14 @@ function deps() {
     checkImage: vi.fn(
       async (url: string): Promise<ImageCheckResult> => ({ url, slot: "campaign", ok: true, status: 200, width: 1000, height: 1180, passesMin: true, minDimension: 800 }),
     ),
+    loadPosts: vi.fn(async (_since: Date | null) => ({
+      posts: [{ mediaType: "IMAGE", images: ["https://scontent.cdninstagram.com/tour.jpg"], caption: "The First Light world tour", timestamp: "2025-12-02T10:00:00+0000", permalink: "" }],
+      error: null as string | null,
+    })),
   } satisfies CampaignsDeps;
 }
 
-const input = {
-  brand: "TIRTIR",
-  site: "tirtir.global",
-  brandDomains: ["tirtir.global"],
-  instagram: { handle: "tirtir_global", posts: [{ mediaType: "IMAGE", mediaUrl: "https://scontent.cdninstagram.com/tour.jpg", caption: "The First Light world tour" }] },
-};
+const input = { brand: "TIRTIR", site: "tirtir.global", brandDomains: ["tirtir.global"], instagram: { handle: "tirtir_global" } };
 const NOW = new Date("2026-10-21T00:00:00Z");
 
 describe("researchCampaigns", () => {
@@ -80,6 +79,13 @@ describe("researchCampaigns", () => {
     d.write.mockResolvedValueOnce(JSON.stringify({ descriptions: ["V fronts TIRTIR's first global campaign."] }));
     const r = await researchCampaigns(input, d, undefined, NOW);
     expect(r.map((c) => c.title)).toEqual(["V&YOU: Let's Radiate"]);
+  });
+
+  it("reads Instagram back to a month before the oldest dated campaign", async () => {
+    const d = deps();
+    await researchCampaigns(input, d, undefined, NOW);
+    // Oldest campaign: "Invented", 2025-01 → from 2024-12-01.
+    expect(d.loadPosts).toHaveBeenCalledWith(new Date("2024-12-01T00:00:00Z"));
   });
 
   it("returns nothing when the search finds nothing", async () => {

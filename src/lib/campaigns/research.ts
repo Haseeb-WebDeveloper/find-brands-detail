@@ -5,12 +5,12 @@ import { chooseImage, scoreImage, type ImageCandidate, type ImageSource, type Im
 import { domainMatchesBrand, registrableDomain } from "@/lib/website/domain";
 import { campaignsPrompt, parseCampaignsAnswer } from "@/lib/campaigns/find";
 import { readCampaignPage } from "@/lib/campaigns/page";
-import { matchPosts, pageMentions } from "@/lib/campaigns/posts";
+import { distinctiveWords, matchPosts, pageMentions } from "@/lib/campaigns/posts";
+import type { IgPost } from "@/lib/instagram/history";
 import { cutToSentence, DESCRIPTION_MAX, describePrompt, parseDescriptions, shortenPrompt } from "@/lib/campaigns/describe";
 import { noLog, type ResearchLog } from "@/lib/research/log-types";
 
-type Post = { mediaUrl: string | null; caption: string | null; mediaType: string };
-export type CampaignsInput = { brand: string; site: string | null; brandDomains: string[]; instagram: { handle: string; posts: Post[] } | null };
+export type CampaignsInput = { brand: string; site: string | null; brandDomains: string[]; instagram: { handle: string } | null };
 
 /** The network and the models, injected so the logic is tested with fakes. */
 export type CampaignsDeps = {
@@ -18,6 +18,8 @@ export type CampaignsDeps = {
   write(prompt: string): Promise<string | null>;
   fetchPage(url: string): Promise<FetchedPage>;
   checkImage(url: string): Promise<ImageCheckResult>;
+  /** The brand's Instagram posts back to `since` (null: the latest ones). */
+  loadPosts(since: Date | null): Promise<{ posts: IgPost[]; error: string | null }>;
 };
 
 export type ResearchedCampaign = {
@@ -31,7 +33,19 @@ export type ResearchedCampaign = {
   chosen: ImageCandidate | null;
 };
 
-const MAX_CHECKS = 5;
+/** Images checked per campaign: a download each. */
+const MAX_CHECKS = 8;
+/** A campaign date: "2024-03", or "2024" (read as its January). */
+const DATE = /^(\d{4})(?:-(\d{2}))?$/;
+
+/** Where to read Instagram back to: a month before the oldest dated campaign; null when none is dated. */
+export function postsSince(found: { date: string | null }[]): Date | null {
+  const months = found.flatMap((c) => {
+    const m = DATE.exec(c.date ?? "");
+    return m ? [Date.UTC(Number(m[1]), Number(m[2] ?? 1) - 2, 1)] : [];
+  });
+  return months.length > 0 ? new Date(Math.min(...months)) : null;
+}
 const host = (url: string) => new URL(url).hostname.replace(/^www\./, "");
 
 export async function researchCampaigns(input: CampaignsInput, deps: CampaignsDeps, log: ResearchLog = noLog, now = new Date()): Promise<ResearchedCampaign[]> {
@@ -42,6 +56,20 @@ export async function researchCampaigns(input: CampaignsInput, deps: CampaignsDe
     return [];
   }
   await log(`Found ${found.length} possible campaign${found.length === 1 ? "" : "s"}: ${found.map((c) => c.title).join(", ")}.`);
+
+  let posts: IgPost[] = [];
+  if (input.instagram) {
+    const since = postsSince(found);
+    const history = await deps.loadPosts(since);
+    posts = history.posts;
+    const oldest = posts.at(-1)?.timestamp.slice(0, 7);
+    await log(
+      history.error && posts.length === 0
+        ? `Couldn't read @${input.instagram.handle}'s posts: ${history.error}`
+        : `Read ${posts.length} @${input.instagram.handle} posts${oldest ? ` back to ${oldest}` : ""} to find campaign images${history.error ? ` (${history.error})` : ""}.`,
+      history.error && posts.length === 0 ? "warn" : "info",
+    );
+  }
 
   const owned = (url: string) => {
     const h = new URL(url).hostname;
@@ -56,23 +84,22 @@ export async function researchCampaigns(input: CampaignsInput, deps: CampaignsDe
       const p = await deps.fetchPage(url);
       if (!p.ok) continue;
       loaded++;
-      const read = readCampaignPage(p.html, p.finalUrl ?? url);
+      const read = readCampaignPage(p.html, p.finalUrl ?? url, distinctiveWords(c.title, input.brand));
       if (pageMentions(read.text, c.title, input.brand)) pages.push({ url, ...read });
     }
-    const posts = input.instagram ? matchPosts(c.title, input.brand, input.instagram.posts) : [];
+    const fromPosts = input.instagram ? matchPosts(c, input.brand, posts) : [];
     // Posts only add images: a caption match alone is too weak to prove a campaign exists.
     if (pages.length === 0) {
       await log(`Dropped "${c.title}": ${loaded === 0 ? "none of its source pages loaded" : "its source pages don't mention it"}.`, "warn");
       continue;
     }
 
-    // Brand-owned images first (spec §3), then third-party pages.
+    // Brand-owned images first (spec §3): the brand's pages, then its Instagram posts (its own
+    // campaign visuals, in the portrait shape the DB shows), then third-party pages.
     const leads: { url: string; source: ImageSource }[] = [];
-    for (const p of [...pages].sort((a, b) => Number(owned(b.url)) - Number(owned(a.url)))) {
-      const source: ImageSource = { kind: owned(p.url) ? "site" : "third_party", label: host(p.url) };
-      for (const u of p.images) leads.push({ url: u, source });
-    }
-    for (const u of posts) leads.push({ url: u, source: { kind: "instagram", label: `a @${input.instagram?.handle} post` } });
+    for (const p of pages.filter((x) => owned(x.url))) for (const u of p.images) leads.push({ url: u, source: { kind: "site", label: host(p.url) } });
+    for (const u of fromPosts) leads.push({ url: u, source: { kind: "instagram", label: `a @${input.instagram?.handle} post` } });
+    for (const p of pages.filter((x) => !owned(x.url))) for (const u of p.images) leads.push({ url: u, source: { kind: "third_party", label: host(p.url) } });
     const images: ResearchedCampaign["images"] = [];
     // One at a time: politeness to each host (Global Constraints).
     for (const lead of leads.filter((l, i, all) => all.findIndex((x) => x.url === l.url) === i).slice(0, MAX_CHECKS)) {

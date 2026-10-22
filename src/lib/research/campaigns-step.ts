@@ -6,9 +6,10 @@ import { fetchPage } from "@/lib/website/fetch-page";
 import { researchCampaigns } from "@/lib/campaigns/research";
 import { parseCampaignsAnswer } from "@/lib/campaigns/find";
 import { loadResearchPages } from "@/lib/research/pages";
+import { fetchPostHistory, type IgPost } from "@/lib/instagram/history";
 import type { ResearchLog } from "@/lib/research/log-types";
 
-type IgEvidence = { recentMedia?: { mediaType: string; mediaUrl: string | null; caption: string | null }[] };
+type IgEvidence = { recentMedia?: { mediaType: string; mediaUrl: string | null; caption: string | null; permalink?: string; timestamp?: string }[] };
 
 /**
  * Runs inside the Inngest job, so it takes no scope (AGENTS.md rule 2 exception). Re-running
@@ -30,8 +31,16 @@ export async function runCampaignsStep(brandId: string, log: ResearchLog): Promi
     brand: name,
     site: site ? new URL(site).hostname.replace(/^www\./, "") : null,
     brandDomains,
-    instagram: ig ? { handle: ig.value, posts: ((ig.evidence ?? {}) as IgEvidence).recentMedia ?? [] } : null,
+    instagram: ig ? { handle: ig.value } : null,
   };
+  // The 12 posts the Instagram step already read: the fallback when the history can't be read.
+  const recent: IgPost[] = (((ig?.evidence ?? {}) as IgEvidence).recentMedia ?? []).map((m) => ({
+    mediaType: m.mediaType,
+    images: m.mediaType === "VIDEO" || !m.mediaUrl ? [] : [m.mediaUrl],
+    caption: m.caption,
+    timestamp: m.timestamp ?? "",
+    permalink: m.permalink ?? "",
+  }));
 
   // The network and model work happens before the transaction, so no database connection waits on it.
   const campaigns = await researchCampaigns(
@@ -45,6 +54,11 @@ export async function runCampaignsStep(brandId: string, log: ResearchLog): Promi
       write: askPlain,
       fetchPage,
       checkImage: (url) => checkImageUrl(url, "campaign"),
+      loadPosts: async (since) => {
+        if (!ig) return { posts: [], error: null };
+        const history = await fetchPostHistory(ig.value, since);
+        return history.posts.length > 0 ? history : { posts: recent, error: history.error };
+      },
     },
     log,
   );

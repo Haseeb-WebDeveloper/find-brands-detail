@@ -12,6 +12,37 @@ describe("readCampaignPage", () => {
     expect(r.images).toEqual(["https://tirtir.global/og.jpg", "https://cdn.x.com/tw.jpg", "https://tirtir.global/a-1600.jpg", "https://tirtir.global/c.jpg"]);
   });
 
+  it("reads lazy-loaded images, <picture> sources and JSON-LD, and skips declared thumbnails", () => {
+    const page = `<html><head><script type="application/ld+json">{"@graph":[{"@type":"NewsArticle","image":{"url":"https://cdn.x.com/lead.jpg"}}]}</script></head>
+<body><main>
+<img src="/placeholder.png" data-src="/lazy.jpg">
+<img data-srcset="/l-600.jpg 600w, /l-1800.jpg 1800w" src="/blank.png">
+<picture><source srcset="/p-800.webp 800w, /p-2000.webp 2000w"><img src="/p-800.jpg"></picture>
+<img src="/thumb.jpg" width="120" height="120">
+</main></body></html>`;
+    expect(readCampaignPage(page, "https://mag.com/a").images).toEqual([
+      "https://cdn.x.com/lead.jpg",
+      "https://mag.com/lazy.jpg",
+      "https://mag.com/l-1800.jpg",
+      "https://mag.com/p-2000.webp",
+      "https://mag.com/p-800.jpg",
+    ]);
+  });
+
+  it("puts images whose description, caption or file name names the campaign first", () => {
+    const page = `<html><head><meta property="og:image" content="/share.jpg"></head><body><article>
+<img src="/unrelated.jpg" alt="Our latest store opening">
+<figure><img src="/key.jpg"><figcaption>The Red Cushion campaign, shot in Seoul</figcaption></figure>
+<img src="/red-cushion-campaign-02.jpg">
+</article></body></html>`;
+    expect(readCampaignPage(page, "https://tirtir.global/p", ["cushion"]).images).toEqual([
+      "https://tirtir.global/key.jpg",
+      "https://tirtir.global/red-cushion-campaign-02.jpg",
+      "https://tirtir.global/share.jpg",
+      "https://tirtir.global/unrelated.jpg",
+    ]);
+  });
+
   it("keeps a short text excerpt to write the description from", () => {
     const r = readCampaignPage(html, "https://tirtir.global/blogs/press/v");
     expect(r.text).toContain("V&YOU campaign");
