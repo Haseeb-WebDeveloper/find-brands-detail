@@ -13,6 +13,7 @@ import { LiveRefresh } from "@/components/app/live-refresh";
 import { CardsLoading } from "@/components/app/shell/page-skeletons";
 import { NewBatchButton } from "@/components/app/research/new-batch-button";
 import { ProgressBar } from "@/components/app/research/progress-bar";
+import { batchTitle } from "@/lib/batches/name";
 
 export const metadata: Metadata = { title: "Batches" };
 
@@ -36,13 +37,11 @@ function BatchCard({ batch }: { batch: BatchListItem }) {
       className="group flex flex-col gap-3 rounded-card bg-surface p-5 transition-shadow hover:shadow-md focus-visible:outline-2 focus-visible:outline-tint"
     >
       <div className="flex items-baseline justify-between gap-3">
-        <span className="text-title-3 text-label">
-          {batch.brandCount} brand{batch.brandCount === 1 ? "" : "s"}
-        </span>
+        <span className="min-w-0 truncate text-title-3 text-label">{batchTitle(batch)}</span>
         <span className="shrink-0 text-footnote text-label-secondary">{sayAgo(batch.createdAt)}</span>
       </div>
       <p className="line-clamp-2 text-callout text-label-secondary">
-        {batch.names.join(", ")}
+        {batch.brandCount} brand{batch.brandCount === 1 ? "" : "s"}: {batch.names.join(", ")}
         {more > 0 ? ` and ${more} more` : ""}
       </p>
       <div className="mt-auto flex flex-col gap-1.5">

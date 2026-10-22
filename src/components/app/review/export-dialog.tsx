@@ -7,6 +7,7 @@ import { Checkbox } from "@/design/checkbox";
 import { Dialog } from "@/design/dialog";
 import { useToast } from "@/design/toast";
 import { exportBrands } from "@/lib/export/actions";
+import { exportFileName } from "@/lib/batches/name";
 
 type Brand = { id: string; name: string; status: string };
 
@@ -23,8 +24,8 @@ function download(csv: string, filename: string) {
   URL.revokeObjectURL(url);
 }
 
-/** "Export": the batch's brands, all ticked; untick any, download the CSV. */
-export function ExportButton({ brands }: { brands: Brand[] }) {
+/** "Export": the batch's brands, all ticked; untick any, download the CSV, named after the batch. */
+export function ExportButton({ brands, batchName }: { brands: Brand[]; batchName: string }) {
   const router = useRouter();
   const toast = useToast();
   const ready = brands.filter(finished);
@@ -68,7 +69,7 @@ export function ExportButton({ brands }: { brands: Brand[] }) {
           start(async () => {
             const r = await exportBrands([...selected]);
             if (!r.ok) return toast(r.error);
-            download(r.csv, r.filename);
+            download(r.csv, exportFileName(batchName, new Date()));
             toast(`Downloaded ${r.count} brand${r.count === 1 ? "" : "s"}.`);
             router.refresh();
             if (r.notes.length > 0) setNotes(r.notes);

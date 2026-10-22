@@ -13,8 +13,17 @@ function toUrl(hint: string): string | null {
   }
 }
 
-/** Brand names can contain commas ("Dear, Klairs"); only a trailing website counts as a hint. */
+/**
+ * Brand names can contain commas ("Dear, Klairs"); only a trailing website counts as a hint. A tab
+ * separates too: two columns pasted from a spreadsheet arrive as "name<TAB>website".
+ */
 function splitLine(line: string): ParsedBrand {
+  const tab = line.indexOf("\t");
+  if (tab > 0) {
+    const tail = line.slice(tab + 1).trim();
+    const url = LOOKS_LIKE_WEBSITE.test(tail) ? toUrl(tail) : null;
+    return { name: line.slice(0, tab).trim(), websiteHint: url };
+  }
   const lastComma = line.lastIndexOf(",");
   if (lastComma > 0) {
     const tail = line.slice(lastComma + 1).trim();

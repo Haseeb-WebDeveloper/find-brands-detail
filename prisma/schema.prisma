@@ -100,6 +100,8 @@ model Invitation {
 
 model Batch {
   id          String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  /// What the reviewer calls it ("Week 43 skincare"), or the date it was started.
+  name        String?
   createdById String?     @map("created_by") @db.Uuid
   createdBy   User?       @relation(fields: [createdById], references: [id], onDelete: SetNull)
   status      BatchStatus @default(active)

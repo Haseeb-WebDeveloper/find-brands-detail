@@ -20,6 +20,17 @@ describe("parseBatchInput", () => {
     expect(parseBatchInput("Dear, Klairs")).toEqual({ brands: [{ name: "Dear, Klairs", websiteHint: null }], errors: [] });
   });
 
+  it("reads two columns pasted from a spreadsheet (tab-separated)", () => {
+    const tab = String.fromCharCode(9);
+    expect(parseBatchInput(`TIRTIR${tab}tirtir.global
+Dear, Klairs${tab}
+numbuzin${tab}not a site`).brands).toEqual([
+      { name: "TIRTIR", websiteHint: "https://tirtir.global/" },
+      { name: "Dear, Klairs", websiteHint: null },
+      { name: "numbuzin", websiteHint: null },
+    ]);
+  });
+
   it("drops duplicates case-insensitively", () => {
     const { brands, errors } = parseBatchInput("Benton\nbenton");
     expect(brands).toHaveLength(1);

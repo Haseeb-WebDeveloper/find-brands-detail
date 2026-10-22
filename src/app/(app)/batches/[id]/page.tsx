@@ -16,6 +16,7 @@ import { ExportButton } from "@/components/app/review/export-dialog";
 import { FillAiButton } from "@/components/app/research/fill-ai-button";
 import { aiAvailable } from "@/lib/ai/models";
 import { canFillAi } from "@/lib/research/ai-fill";
+import { batchTitle } from "@/lib/batches/name";
 
 export const metadata: Metadata = { title: "Batch" };
 
@@ -33,17 +34,16 @@ async function Batch({ params }: { params: Promise<{ id: string }> }) {
   const researched = batch.brands.filter((b) => b.status !== "queued" && b.status !== "researching").length;
   const reviewed = batch.brands.filter((b) => b.status === "approved" || b.status === "exported").length;
   const next = batch.brands.find((b) => b.status === "needs_review");
-  const day = new Date(batch.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 
   return (
     <>
       <PageHeader
-        title={`Batch of ${day}`}
+        title={batchTitle(batch)}
         back={{ href: "/", label: "Batches" }}
         actions={
           <div className="flex items-center gap-2">
             {toFill > 0 && !running ? <FillAiButton target={{ batchId: batch.id }} label={`Fill in missing AI parts (${toFill})`} /> : null}
-            {scopeCan(scope, "batches:write") ? <ExportButton brands={batch.brands.map((b) => ({ id: b.id, name: b.name, status: b.status }))} /> : null}
+            {scopeCan(scope, "batches:write") ? <ExportButton batchName={batchTitle(batch)} brands={batch.brands.map((b) => ({ id: b.id, name: b.name, status: b.status }))} /> : null}
             {next ? (
               <Button kind="filled" href={`/brands/${next.id}`}>
                 {reviewed > 0 ? "Continue reviewing" : "Start reviewing"}

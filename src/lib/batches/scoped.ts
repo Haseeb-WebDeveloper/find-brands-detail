@@ -8,6 +8,7 @@ import { missingAiParts, stuckBrandIds, type MissingAi } from "@/lib/research/ai
 
 export type BatchListItem = {
   id: string;
+  name: string | null;
   createdAt: string;
   createdBy: string | null;
   brandCount: number;
@@ -54,6 +55,7 @@ export async function listBatches(_scope: TeamScope): Promise<BatchListItem[]> {
     orderBy: { createdAt: "desc" },
     select: {
       id: true,
+      name: true,
       createdAt: true,
       createdBy: { select: { email: true } },
       brands: { orderBy: { createdAt: "asc" }, select: { name: true, status: true, error: true } },
@@ -61,6 +63,7 @@ export async function listBatches(_scope: TeamScope): Promise<BatchListItem[]> {
   });
   return batches.map((b) => ({
     id: b.id,
+    name: b.name,
     createdAt: b.createdAt.toISOString(),
     createdBy: b.createdBy?.email ?? null,
     brandCount: b.brands.length,
@@ -77,10 +80,10 @@ export async function listBatches(_scope: TeamScope): Promise<BatchListItem[]> {
 export async function getBatch(
   _scope: TeamScope,
   id: string,
-): Promise<{ id: string; createdAt: string; brands: BrandRow[]; log: LogLine[] } | null> {
+): Promise<{ id: string; name: string | null; createdAt: string; brands: BrandRow[]; log: LogLine[] } | null> {
   // Separate queries, all at once: each round trip to the database is ~200ms (brands/scoped.ts).
   const [batch, brands, selections, campaigns, log] = await Promise.all([
-    prisma.batch.findUnique({ where: { id }, select: { id: true, createdAt: true } }),
+    prisma.batch.findUnique({ where: { id }, select: { id: true, name: true, createdAt: true } }),
     prisma.brand.findMany({
       where: { batchId: id },
       orderBy: { createdAt: "asc" },
@@ -103,6 +106,7 @@ export async function getBatch(
   const stuck = stuckBrandIds(brands, Date.now());
   return {
     id: batch.id,
+    name: batch.name,
     createdAt: batch.createdAt.toISOString(),
     brands: brands.map(({ updatedAt: _updatedAt, text, ...b }) => {
       const mine = selections.filter((x) => x.brandId === b.id);
