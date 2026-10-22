@@ -5,6 +5,8 @@
  * every failure is "no results", never an error.
  */
 
+import { compactName } from "@/lib/website/domain";
+
 export type ImageHit = { url: string; page: string; title: string; width: number | null; height: number | null };
 
 const UA = {
@@ -33,28 +35,33 @@ export function parseBing(html: string): ImageHit[] {
   return out;
 }
 
-async function duckDuckGo(query: string): Promise<ImageHit[]> {
+/** `wide`: large landscape images only, for covers (DuckDuckGo: 97 of 100 results landscape, measured 2026-10-22). */
+type SearchOptions = { wide?: boolean };
+
+async function duckDuckGo(query: string, { wide }: SearchOptions): Promise<ImageHit[]> {
   const q = encodeURIComponent(query);
   const page = await (await fetch(`https://duckduckgo.com/?q=${q}&iax=images&ia=images`, { headers: UA, signal: AbortSignal.timeout(TIMEOUT_MS) })).text();
   const vqd = page.match(/vqd=["']?([\d-]+)/)?.[1];
   if (!vqd) return [];
-  const res = await fetch(`https://duckduckgo.com/i.js?l=us-en&o=json&q=${q}&vqd=${vqd}&f=,,,,,&p=1`, {
+  const filters = encodeURIComponent(wide ? ",size:Large,,,layout:Wide," : ",,,,,");
+  const res = await fetch(`https://duckduckgo.com/i.js?l=us-en&o=json&q=${q}&vqd=${vqd}&f=${filters}&p=1`, {
     headers: { ...UA, referer: "https://duckduckgo.com/" },
     signal: AbortSignal.timeout(TIMEOUT_MS),
   });
   return res.ok ? parseDuckDuckGo(await res.json()) : [];
 }
 
-async function bing(query: string): Promise<ImageHit[]> {
-  const res = await fetch(`https://www.bing.com/images/async?q=${encodeURIComponent(query)}&first=0&count=35&mmasync=1`, { headers: UA, signal: AbortSignal.timeout(TIMEOUT_MS) });
+async function bing(query: string, { wide }: SearchOptions): Promise<ImageHit[]> {
+  const filters = wide ? `&qft=${encodeURIComponent("+filterui:aspect-wide+filterui:imagesize-large")}` : "";
+  const res = await fetch(`https://www.bing.com/images/async?q=${encodeURIComponent(query)}&first=0&count=35&mmasync=1${filters}`, { headers: UA, signal: AbortSignal.timeout(TIMEOUT_MS) });
   return res.ok ? parseBing(await res.text()) : [];
 }
 
 /** Image results for a query: DuckDuckGo's, else Bing's, else none. Never throws. */
-export async function searchImages(query: string): Promise<{ hits: ImageHit[]; engine: "DuckDuckGo" | "Bing" | null }> {
+export async function searchImages(query: string, options: SearchOptions = {}): Promise<{ hits: ImageHit[]; engine: "DuckDuckGo" | "Bing" | null }> {
   for (const [engine, run] of [["DuckDuckGo", duckDuckGo], ["Bing", bing]] as const) {
     try {
-      const hits = await run(query);
+      const hits = await run(query, options);
       if (hits.length > 0) return { hits, engine };
     } catch {
       // Blocked or changed: try the next engine.
@@ -103,4 +110,48 @@ export function rankHits(hits: ImageHit[], words: string[], owned: (url: string)
     .sort((a, b) => b.hits - a.hits || Number(b.own) - Number(a.own) || Math.round(a.misfit * 10) - Math.round(b.misfit * 10) || b.size - a.size)
     .slice(0, max)
     .map((x) => x.h);
+}
+
+/** The cover frame (db-admin's fill aspect) and the narrowest a cover may be (images/score.ts). */
+const COVER_SHAPE = 16 / 11;
+const MIN_COVER_RATIO = 1.3;
+
+/**
+ * Cover results worth checking, best first, by rules alone: the page title or file name names the
+ * brand; declared landscape and at least 800 px; then the brand's own site; then the closest to the
+ * cover frame, and the biggest.
+ */
+export function rankCoverHits(hits: ImageHit[], brand: string, owned: (url: string) => boolean, max: number): ImageHit[] {
+  const name = compactName(brand);
+  if (!name) return [];
+  const seen = new Set<string>();
+  return hits
+    .filter((h) => !JUNK.test(hostOf(h.url)) && !(seen.has(h.url) || !seen.add(h.url)))
+    .filter((h) => compactName(`${h.title} ${fileOf(h.url)}`).includes(name))
+    .filter((h) => !(h.width && h.height && (Math.max(h.width, h.height) < MIN_EDGE || h.width / h.height < MIN_COVER_RATIO)))
+    .map((h) => ({
+      h,
+      own: owned(h.page) || owned(h.url),
+      misfit: h.width && h.height ? Math.abs(Math.log(h.width / h.height / COVER_SHAPE)) : 1,
+      size: Math.min(h.width ?? 0, h.height ?? 0),
+    }))
+    .sort((a, b) => Number(b.own) - Number(a.own) || Math.round(a.misfit * 10) - Math.round(b.misfit * 10) || b.size - a.size)
+    .slice(0, max)
+    .map((x) => x.h);
+}
+
+function hostOf(u: string): string {
+  try {
+    return new URL(u).hostname;
+  } catch {
+    return "";
+  }
+}
+
+function fileOf(u: string): string {
+  try {
+    return decodeURIComponent(new URL(u).pathname);
+  } catch {
+    return u;
+  }
 }

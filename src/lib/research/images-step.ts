@@ -3,6 +3,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { checkImageUrl } from "@/lib/images/check-image";
 import { researchImages } from "@/lib/images/research";
+import { searchImages } from "@/lib/images/search";
 import { loadResearchPages } from "@/lib/research/pages";
 import type { ResearchLog } from "@/lib/research/log-types";
 
@@ -15,7 +16,7 @@ type TtEvidence = { avatarUrl?: string | null };
  * exception). Re-running replaces the logo and cover candidates and their auto selections.
  */
 export async function runImagesStep(brandId: string, log: ResearchLog): Promise<void> {
-  const [{ pages }, selections] = await Promise.all([
+  const [{ name, pages, brandDomains }, selections] = await Promise.all([
     loadResearchPages(brandId),
     prisma.selection.findMany({ where: { brandId, field: { in: ["instagram", "tiktok"] } }, include: { candidate: true } }),
   ]);
@@ -24,6 +25,8 @@ export async function runImagesStep(brandId: string, log: ResearchLog): Promise<
   const igE = (ig?.evidence ?? {}) as IgEvidence;
   const ttE = (tt?.evidence ?? {}) as TtEvidence;
   const input = {
+    brand: name,
+    brandDomains,
     pages: pages.map((p) => ({ url: p.url, facts: p.facts })),
     instagram: ig
       ? {
@@ -36,7 +39,7 @@ export async function runImagesStep(brandId: string, log: ResearchLog): Promise<
   };
 
   // The network work happens before the transaction, so no database connection waits on a download.
-  const result = await researchImages(input, { checkImage: checkImageUrl }, log);
+  const result = await researchImages(input, { checkImage: checkImageUrl, searchImages }, log);
 
   await prisma.$transaction(async (tx) => {
     for (const field of ["logo", "cover"] as const) {

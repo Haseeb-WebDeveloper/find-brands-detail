@@ -11,6 +11,8 @@ const MAX_LOGO_RATIO = 2;
 const SHAPE = { logo: 1, cover: 16 / 11, campaign: 200 / 236 } as const;
 /** A cover is a landscape banner; anything narrower than this is a portrait or a square (owner, 2026-10-21). */
 const MIN_COVER_RATIO = 1.3;
+/** How far from the 16:11 frame a cover may be and still count as a good fit: about 1.3:1 to 2.3:1. */
+const COVER_FIT = 0.45;
 /** Logos: the brand's own profile picture first, Instagram's then TikTok's (owner, 2026-10-21: "that is the best option"). */
 const LOGO_SOURCE = { instagram: 0, tiktok: 1, site: 2, third_party: 3 } as const;
 
@@ -56,7 +58,14 @@ export function chooseImage(scored: { candidate: ImageCandidate; verdict: ImageV
     .filter((c) => c.slot === "logo" && (c.source.kind === "instagram" || c.source.kind === "tiktok"))
     .sort((a, b) => LOGO_SOURCE[a.source.kind] - LOGO_SOURCE[b.source.kind]);
   if (profile.length > 0) return profile[0];
-  const rank = (c: ImageCandidate) => [Math.round(misfit(c) * 10), -Math.min(c.check.width ?? 0, c.check.height ?? 0)];
+  // Covers: a reasonable fit to the frame, then the order they were found in (a site's first hero
+  // slide is its current campaign; size alone picked a 3000×1500 menu tile over TIRTIR's hero).
+  // Everything else: the closest fit, then the biggest.
+  const order = new Map(scored.map((s, i) => [s.candidate, i]));
+  const rank = (c: ImageCandidate) =>
+    c.slot === "cover"
+      ? [misfit(c) > COVER_FIT ? 1 : 0, order.get(c) ?? 0]
+      : [Math.round(misfit(c) * 10), -Math.min(c.check.width ?? 0, c.check.height ?? 0)];
   const better = (a: ImageCandidate, b: ImageCandidate) => {
     const [x, y] = [rank(a), rank(b)];
     for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) return x[i] < y[i];

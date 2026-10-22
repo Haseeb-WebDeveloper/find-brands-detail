@@ -1,5 +1,6 @@
 import * as cheerio from "cheerio";
 import { domainMatchesBrand, registrableDomain } from "@/lib/website/domain";
+import { absolute, backgroundImage, realSource } from "@/lib/website/img-source";
 
 /** What one page of a brand's site tells the later research steps. */
 export type PageFacts = {
@@ -12,6 +13,8 @@ export type PageFacts = {
   /** Primary language subtag of <html lang> ("ja" from "ja-JP"), lowercase; null when absent. */
   lang: string | null;
   ogImage: string | null;
+  /** The page's banner images (hero, slider, carousel), first slide first: cover candidates. */
+  bannerImages?: string[];
   icons: string[];
   logoImages: string[];
   jsonLdLogos: string[];
@@ -22,14 +25,6 @@ const IG_RESERVED = new Set(["p", "reel", "reels", "stories", "explore", "accoun
 const IG_RE = /instagram\.com\/([A-Za-z0-9._]{1,30})(?=[/?"'#\s]|$)/gi;
 const TT_RE = /tiktok\.com\/@([A-Za-z0-9._]{2,24})(?=[/?"'#\s]|$)/gi;
 
-function absolute(href: string | undefined | null, base: string): string | null {
-  if (!href) return null;
-  try {
-    return new URL(href.trim(), base).toString();
-  } catch {
-    return null;
-  }
-}
 
 function handles(source: string, re: RegExp, reserved = new Set<string>()): string[] {
   const out = new Set<string>();
@@ -55,6 +50,41 @@ function jsonLd($: cheerio.CheerioAPI): unknown[] {
 
 function isString(u: string | null): u is string {
   return typeof u === "string" && u.length > 0;
+}
+
+/** Where sites put their banners: a hero, banner, slider, carousel, key visual… in a class or id. */
+const BANNER_AREA = /hero|banner|slide|carousel|swiper|keyvisual|key-visual|main-?visual|billboard|masthead|jumbotron/i;
+/** Never a banner: icons, logos, placeholders, and product shots from a product slider. */
+const NOT_BANNER = /\.(svg|gif)(\?|$)|^data:|logo|icon|avatar|sprite|placeholder|spacer|pixel|badge|thumb|btn[_-]|button|\/products?\//i;
+/** Areas whose images are never the page's banner: menus, navigation, drawers, footers. */
+const NOT_AREA = /menu|(^|[\s_-])nav|drawer|footer/i;
+const MAX_BANNERS = 6;
+
+/**
+ * The banner images of a page, first slide first: <img>s, <picture> sources and inline background
+ * images inside a banner area, at their real (lazy-loaded, largest) address. Images declared small
+ * or not landscape are left out; undeclared ones are measured later, at the image check.
+ */
+function bannerImages($: cheerio.CheerioAPI, pageUrl: string): string[] {
+  const out: string[] = [];
+  $("img, picture source, [style*=background]").each((_, el) => {
+    if (out.length >= MAX_BANNERS * 2) return;
+    const node = $(el);
+    const areas = node
+      .parents()
+      .addBack()
+      .toArray()
+      .map((e) => `${$(e).attr("class") ?? ""} ${$(e).attr("id") ?? ""}`);
+    // A menu's promo tiles (TIRTIR's mega menu: 3000×1500 "bestsellers") are not the page's banner.
+    if (!areas.some((a) => BANNER_AREA.test(a)) || areas.some((a) => NOT_AREA.test(a)) || node.closest("nav, footer").length > 0) return;
+    const raw = node.is("img, source") ? realSource((n) => node.attr(n)) : backgroundImage(node.attr("style"));
+    const src = absolute(raw, pageUrl);
+    if (!src || NOT_BANNER.test(src)) return;
+    const w = Number(node.attr("width")), h = Number(node.attr("height"));
+    if (w > 0 && h > 0 && (Math.max(w, h) < 600 || w / h < 1.2)) return;
+    out.push(src);
+  });
+  return [...new Set(out)].slice(0, MAX_BANNERS);
 }
 
 export function extractFacts(html: string, pageUrl: string, brand: string): PageFacts {
@@ -104,6 +134,7 @@ export function extractFacts(html: string, pageUrl: string, brand: string): Page
     regionalSites: [...regional],
     lang: $("html").attr("lang")?.trim().toLowerCase().split(/[-_]/)[0] || null,
     ogImage: absolute($('meta[property="og:image"]').attr("content"), pageUrl),
+    bannerImages: bannerImages($, pageUrl),
     icons: [...new Set(icons)],
     logoImages: [...new Set(logoImages)],
     jsonLdLogos: [...new Set(ldLogos)],
