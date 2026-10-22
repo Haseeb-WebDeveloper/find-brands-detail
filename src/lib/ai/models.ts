@@ -4,11 +4,19 @@ import { noLog, type ResearchLog } from "@/lib/research/log-types";
 type Effort = "low" | "medium";
 
 /**
+ * Groq keys in the order they're used: GROQ_API_KEY, then GROQ_API_KEY_2 and GROQ_API_KEY_3. Each has
+ * its own quota, so one over its limit hands over to the next.
+ */
+const GROQ_KEY_VARS = ["GROQ_API_KEY", "GROQ_API_KEY_2", "GROQ_API_KEY_3"] as const;
+const groqKeys = () =>
+  GROQ_KEY_VARS.map((v, n) => ({ label: n === 0 ? "Groq" : `Groq ${n + 1}`, key: process.env[v] })).filter((k): k is { label: string; key: string } => Boolean(k.key));
+
+/**
  * Whether any model is set up. Only finding a website (when none is given) and finding and describing
  * campaigns need one; every other step works without (spec 2026-10-21 §3).
  */
 export function aiAvailable(): boolean {
-  return Boolean(process.env.GROQ_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY);
+  return groqKeys().length > 0 || Boolean(process.env.GOOGLE_GENERATIVE_AI_API_KEY);
 }
 const TIMEOUT_MS = 120_000;
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
@@ -23,18 +31,18 @@ const restingUntil = new Map<string, number>();
 const resting = (label: string) => (restingUntil.get(label) ?? 0) > Date.now();
 const rest = (label: string) => restingUntil.set(label, Date.now() + COOLDOWN_MS);
 
-/**
- * Web-searching models, tried in order (contractor-sites' chain): Groq first, Gemini when Groq has
- * no key, errors or hits its quota. Search-grounded calls cannot also enforce a JSON schema, so
- * callers ask for JSON in the prompt and validate it.
- */
-const SEARCHERS: { label: string; ready: () => boolean; run: (prompt: string, effort: Effort) => Promise<string> }[] = [
-  {
-    label: "Groq",
-    ready: () => Boolean(process.env.GROQ_API_KEY),
-    run: async (prompt, effort) => {
+type Model = { label: string; search: (prompt: string, effort: Effort) => Promise<string>; write: (prompt: string) => Promise<string> };
+
+function groqModel({ label, key }: { label: string; key: string }): Model {
+  const provider = async () => {
+    const { createGroq } = await import("@ai-sdk/groq");
+    return createGroq({ apiKey: key });
+  };
+  return {
+    label,
+    search: async (prompt, effort) => {
       const { generateText } = await import("ai");
-      const { groq } = await import("@ai-sdk/groq");
+      const groq = await provider();
       const ask = async () =>
         (
           await generateText({
@@ -54,23 +62,48 @@ const SEARCHERS: { label: string; ready: () => boolean; run: (prompt: string, ef
         return ask();
       }
     },
-  },
-  {
-    label: "Gemini",
-    ready: () => Boolean(process.env.GOOGLE_GENERATIVE_AI_API_KEY),
-    run: async (prompt) => {
+    write: async (prompt) => {
       const { generateText } = await import("ai");
-      const { google } = await import("@ai-sdk/google");
-      const { text } = await generateText({
-        model: google("gemini-2.5-flash"),
-        tools: { google_search: google.tools.googleSearch({}) },
-        abortSignal: AbortSignal.timeout(TIMEOUT_MS),
-        prompt,
-      });
-      return text;
+      const groq = await provider();
+      return (
+        await generateText({
+          model: groq("openai/gpt-oss-120b"),
+          providerOptions: { groq: { reasoningEffort: "low", reasoningFormat: "hidden" } },
+          abortSignal: AbortSignal.timeout(TIMEOUT_MS),
+          prompt,
+        })
+      ).text;
     },
+  };
+}
+
+const gemini: Model = {
+  label: "Gemini",
+  search: async (prompt) => {
+    const { generateText } = await import("ai");
+    const { google } = await import("@ai-sdk/google");
+    const { text } = await generateText({
+      model: google("gemini-2.5-flash"),
+      tools: { google_search: google.tools.googleSearch({}) },
+      abortSignal: AbortSignal.timeout(TIMEOUT_MS),
+      prompt,
+    });
+    return text;
   },
-];
+  write: async (prompt) => {
+    const { generateText } = await import("ai");
+    const { google } = await import("@ai-sdk/google");
+    return (await generateText({ model: google("gemini-2.5-flash"), abortSignal: AbortSignal.timeout(TIMEOUT_MS), prompt })).text;
+  },
+};
+
+/**
+ * The models with a key and not resting, in order (contractor-sites' chain): each Groq key, then
+ * Gemini when every Groq key errors or is over its limit. Search-grounded calls cannot also enforce a
+ * JSON schema, so callers ask for JSON in the prompt and validate it.
+ */
+const models = (): Model[] =>
+  [...groqKeys().map(groqModel), ...(process.env.GOOGLE_GENERATIVE_AI_API_KEY ? [gemini] : [])].filter((m) => !resting(m.label));
 
 /**
  * Asks each searching model in turn until one answers with text `accept` takes. Never throws: no
@@ -80,47 +113,29 @@ export async function askWithSearch(
   prompt: string,
   { what, effort, log = noLog, accept = () => true }: { what: string; effort: Effort; log?: ResearchLog; accept?: (text: string) => boolean },
 ): Promise<string | null> {
-  for (const s of SEARCHERS.filter((x) => x.ready() && !resting(x.label))) {
+  for (const m of models()) {
     try {
-      await log(`Searching the web for ${what} with ${s.label}. This can take a minute…`);
-      const text = await s.run(prompt, effort);
+      await log(`Searching the web for ${what} with ${m.label}. This can take a minute…`);
+      const text = await m.search(prompt, effort);
       if (accept(text)) return text;
-      await log(`${s.label} found nothing usable.`, "warn");
+      await log(`${m.label} found nothing usable.`, "warn");
     } catch (error) {
-      console.error(`[ai] ${s.label} search failed: ${message(error).slice(0, 200)}`);
-      if (isQuota(error)) rest(s.label);
-      await log(isQuota(error) ? `${s.label} is over its limit; it is skipped for the next 30 minutes.` : `${s.label} search failed.`, "warn");
+      console.error(`[ai] ${m.label} search failed: ${message(error).slice(0, 200)}`);
+      if (isQuota(error)) rest(m.label);
+      await log(isQuota(error) ? `${m.label} is over its limit; it is skipped for the next 30 minutes.` : `${m.label} search failed.`, "warn");
     }
   }
   return null;
 }
 
-/** A plain (no search) answer for writing and extraction: Groq, then Gemini. Never throws. */
+/** A plain (no search) answer for writing and extraction, from the same chain. Never throws. */
 export async function askPlain(prompt: string): Promise<string | null> {
-  const { generateText } = await import("ai");
-  if (process.env.GROQ_API_KEY && !resting("Groq")) {
+  for (const m of models()) {
     try {
-      const { groq } = await import("@ai-sdk/groq");
-      return (
-        await generateText({
-          model: groq("openai/gpt-oss-120b"),
-          providerOptions: { groq: { reasoningEffort: "low", reasoningFormat: "hidden" } },
-          abortSignal: AbortSignal.timeout(TIMEOUT_MS),
-          prompt,
-        })
-      ).text;
+      return await m.write(prompt);
     } catch (error) {
-      if (isQuota(error)) rest("Groq");
-      console.error(`[ai] Groq writing failed: ${message(error).slice(0, 200)}`);
-    }
-  }
-  if (process.env.GOOGLE_GENERATIVE_AI_API_KEY && !resting("Gemini")) {
-    try {
-      const { google } = await import("@ai-sdk/google");
-      return (await generateText({ model: google("gemini-2.5-flash"), abortSignal: AbortSignal.timeout(TIMEOUT_MS), prompt })).text;
-    } catch (error) {
-      if (isQuota(error)) rest("Gemini");
-      console.error(`[ai] Gemini writing failed: ${message(error).slice(0, 200)}`);
+      if (isQuota(error)) rest(m.label);
+      console.error(`[ai] ${m.label} writing failed: ${message(error).slice(0, 200)}`);
     }
   }
   return null;

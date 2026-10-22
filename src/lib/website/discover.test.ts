@@ -24,16 +24,15 @@ describe("parseSitesAnswer", () => {
 
 describe("findOfficialSites without an AI key", () => {
   it("says so and returns nothing, at once", async () => {
-    const saved = { groq: process.env.GROQ_API_KEY, gemini: process.env.GOOGLE_GENERATIVE_AI_API_KEY };
-    delete process.env.GROQ_API_KEY;
-    delete process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+    const vars = ["GROQ_API_KEY", "GROQ_API_KEY_2", "GROQ_API_KEY_3", "GOOGLE_GENERATIVE_AI_API_KEY"];
+    const saved = Object.fromEntries(vars.map((v) => [v, process.env[v]]));
+    for (const v of vars) delete process.env[v];
     try {
       const lines: string[] = [];
       expect(await findOfficialSites("numbuzin", async (m) => void lines.push(m))).toEqual([]);
       expect(lines[0]).toMatch(/^No AI key is set up, so no website was searched/);
     } finally {
-      if (saved.groq) process.env.GROQ_API_KEY = saved.groq;
-      if (saved.gemini) process.env.GOOGLE_GENERATIVE_AI_API_KEY = saved.gemini;
+      for (const v of vars) if (saved[v]) process.env[v] = saved[v];
     }
   });
 });
