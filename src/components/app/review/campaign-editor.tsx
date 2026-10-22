@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
-import { SortableContext, arrayMove, horizontalListSortingStrategy, rectSortingStrategy, useSortable } from "@dnd-kit/sortable";
+import { SortableContext, arrayMove, rectSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Dialog } from "@/design/dialog";
 import { TextField } from "@/design/text-field";
@@ -14,8 +14,6 @@ import { ImageViewer } from "@/components/app/review/image-viewer";
 import {
   addCampaign,
   addCampaignImage,
-  deleteCampaignImage,
-  reorderCampaignImages,
   reorderCampaigns,
   saveCampaign,
   selectCampaignImage,
@@ -24,8 +22,6 @@ import {
 
 /** The DB importer's limit. */
 const MAX = 500;
-
-type Image = CampaignCard["images"][number];
 
 function useRun() {
   const router = useRouter();
@@ -79,61 +75,15 @@ function Description({ value, onChange }: { value: string; onChange: (v: string)
   );
 }
 
-/** One of a campaign's images in the edit dialog: drag to reorder, click to use, × to delete. */
-function SortableImage({ image, used, busy, onUse, onDelete }: { image: Image; used: boolean; busy: boolean; onUse: () => void; onDelete: () => void }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: image.id, disabled: busy });
-  return (
-    <div
-      ref={setNodeRef}
-      style={{ transform: CSS.Transform.toString(transform), transition }}
-      className={cn("group relative w-20 shrink-0 touch-none", isDragging && "z-10 opacity-80")}
-      {...attributes}
-      {...listeners}
-    >
-      <button
-        type="button"
-        disabled={busy || image.score === "rejected"}
-        title={`${image.reason}${image.score !== "rejected" && !used ? " — click to use this image" : ""}`}
-        onClick={onUse}
-        className={cn("block w-full cursor-grab overflow-hidden rounded-md active:cursor-grabbing", used ? "ring-2 ring-tint" : "opacity-85 hover:opacity-100", image.score === "rejected" && "opacity-30")}
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={image.url} alt="" loading="lazy" referrerPolicy="no-referrer" draggable={false} className="aspect-[200/236] w-full bg-fill object-cover" />
-      </button>
-      {used ? <span className="absolute bottom-1 left-1 rounded bg-tint px-1.5 text-caption font-medium text-tint-contrast">Used</span> : null}
-      <button
-        type="button"
-        disabled={busy}
-        aria-label="Delete this image"
-        title="Delete this image"
-        onClick={onDelete}
-        className="absolute top-1 right-1 grid size-6 place-items-center rounded-full bg-black/60 text-callout leading-none text-white opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
-      >
-        ×
-      </button>
-    </div>
-  );
-}
-
 /** Title, description and images of one campaign, in a dialog over the brand. */
 function EditDialog({ c, open, onOpenChange }: { c: CampaignCard; open: boolean; onOpenChange: (open: boolean) => void }) {
   const [pending, run] = useRun();
   const [title, setTitle] = useState(c.title);
   const [description, setDescription] = useState(c.description);
   const [imageUrl, setImageUrl] = useState("");
-  const sensors = useDragSensors();
-  const [order, setOrder] = useOrder(c.images.map((i) => i.id));
-  const byId = new Map(c.images.map((i) => [i.id, i]));
-  const images = order.map((id) => byId.get(id)).filter((i): i is Image => Boolean(i));
-  // The first usable image is the one used (review/store.ts).
-  const usedId = images.find((i) => i.score !== "rejected")?.id ?? null;
-
-  const onDragEnd = ({ active, over }: DragEndEvent) => {
-    if (!over || active.id === over.id) return;
-    const next = arrayMove(order, order.indexOf(String(active.id)), order.indexOf(String(over.id)));
-    setOrder(next);
-    run(() => reorderCampaignImages(c.id, next));
-  };
+  // The one used, then the others as suggestions to pick from. Rejected images aren't offered.
+  const used = c.images.find((i) => i.selected) ?? null;
+  const images = c.images.filter((i) => i.score !== "rejected");
 
   return (
     <Dialog
@@ -151,30 +101,26 @@ function EditDialog({ c, open, onOpenChange }: { c: CampaignCard; open: boolean;
         <Description value={description} onChange={setDescription} />
         {images.length > 0 ? (
           <div className="flex flex-col gap-1.5">
-            <span className="text-subhead text-label-secondary">Images — drag to reorder; the first is used</span>
-            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
-              <SortableContext items={order} strategy={horizontalListSortingStrategy}>
-                <div className="flex flex-wrap gap-2">
-                  {images.map((i) => (
-                    <SortableImage
-                      key={i.id}
-                      image={i}
-                      used={i.id === usedId}
-                      busy={pending}
-                      onUse={() => {
-                        if (i.id === usedId) return;
-                        setOrder([i.id, ...order.filter((id) => id !== i.id)]);
-                        run(() => selectCampaignImage(c.id, i.id));
-                      }}
-                      onDelete={() => {
-                        setOrder(order.filter((id) => id !== i.id));
-                        run(() => deleteCampaignImage(c.id, i.id), "Image deleted.");
-                      }}
-                    />
-                  ))}
-                </div>
-              </SortableContext>
-            </DndContext>
+            <span className="text-subhead text-label-secondary">Image — click another to use it instead</span>
+            <div className="flex flex-wrap gap-2">
+              {images.map((i) => {
+                const isUsed = i.id === used?.id;
+                return (
+                  <button
+                    key={i.id}
+                    type="button"
+                    disabled={pending || isUsed}
+                    title={i.reason}
+                    onClick={() => run(() => selectCampaignImage(c.id, i.id))}
+                    className={cn("relative w-20 shrink-0 overflow-hidden rounded-md", isUsed ? "ring-2 ring-tint" : "opacity-75 hover:opacity-100")}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={i.url} alt="" loading="lazy" referrerPolicy="no-referrer" className="aspect-[200/236] w-full bg-fill object-cover" />
+                    {isUsed ? <span className="absolute bottom-1 left-1 rounded bg-tint px-1.5 text-caption font-medium text-tint-contrast">Used</span> : null}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         ) : null}
         <div className="flex items-end gap-2">

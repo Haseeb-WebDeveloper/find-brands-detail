@@ -107,49 +107,14 @@ export async function setCampaignStatus(_scope: TeamScope, campaignId: string, s
   });
 }
 
-/**
- * A campaign's images in the reviewer's order. THE FIRST USABLE ONE IS THE ONE USED (and exported):
- * dragging an image to the front, or choosing it, makes it the campaign's image. `ids` not given keep
- * their order after the given ones.
- */
-async function orderImages(tx: Tx, campaignId: string, ids: string[]) {
-  const images = await tx.campaignImage.findMany({ where: { campaignId }, orderBy: [{ position: "asc" }, { id: "asc" }], select: { id: true, score: true } });
-  const known = new Set(images.map((i) => i.id));
-  const order = [...ids.filter((id) => known.has(id)), ...images.map((i) => i.id).filter((id) => !ids.includes(id))];
-  const used = order.find((id) => images.find((i) => i.id === id)?.score !== "rejected") ?? null;
-  for (const [position, id] of order.entries()) {
-    await tx.campaignImage.update({ where: { id }, data: { position, selected: id === used } });
-  }
-}
-
-/** "Use this image": it moves to the front. */
+/** The image used for the campaign (and exported); the others stay as suggestions to pick from. */
 export async function selectCampaignImage(_scope: TeamScope, campaignId: string, imageId: string): Promise<Written> {
   return prisma.$transaction(async (tx) => {
     const c = await campaignOwner(tx, campaignId);
     const image = await tx.campaignImage.findFirst({ where: { id: imageId, campaignId }, select: { id: true } });
     if (!c || !image) return null;
-    await orderImages(tx, campaignId, [imageId]);
-    return { brandId: c.brandId, batchId: c.batchId };
-  });
-}
-
-export async function reorderCampaignImages(_scope: TeamScope, campaignId: string, ids: string[]): Promise<Written> {
-  return prisma.$transaction(async (tx) => {
-    const c = await campaignOwner(tx, campaignId);
-    if (!c) return null;
-    await orderImages(tx, campaignId, ids);
-    return { brandId: c.brandId, batchId: c.batchId };
-  });
-}
-
-/** Removes one image; if it was the one used, the next in order takes its place. */
-export async function deleteCampaignImage(_scope: TeamScope, campaignId: string, imageId: string): Promise<Written> {
-  return prisma.$transaction(async (tx) => {
-    const c = await campaignOwner(tx, campaignId);
-    const image = await tx.campaignImage.findFirst({ where: { id: imageId, campaignId }, select: { id: true } });
-    if (!c || !image) return null;
-    await tx.campaignImage.delete({ where: { id: imageId } });
-    await orderImages(tx, campaignId, []);
+    await tx.campaignImage.updateMany({ where: { campaignId }, data: { selected: false } });
+    await tx.campaignImage.update({ where: { id: imageId }, data: { selected: true } });
     return { brandId: c.brandId, batchId: c.batchId };
   });
 }
@@ -169,13 +134,14 @@ export async function reorderCampaigns(_scope: TeamScope, brandId: string, ids: 
 
 export type CheckedImage = { url: string; sourceKind: "brand" | "third_party"; width: number | null; height: number | null; score: CandidateScore; reason: string };
 
-/** A reviewer's image for a campaign, already checked; it goes to the front, so it's the one used. */
+/** A reviewer's image for a campaign, already checked: it is listed first and becomes the one used. */
 export async function addCampaignImage(_scope: TeamScope, campaignId: string, image: CheckedImage): Promise<Written> {
   return prisma.$transaction(async (tx) => {
     const c = await campaignOwner(tx, campaignId);
     if (!c) return null;
-    const created = await tx.campaignImage.create({ data: { campaignId, ...image, selected: false, position: -1 }, select: { id: true } });
-    await orderImages(tx, campaignId, [created.id]);
+    const first = await tx.campaignImage.aggregate({ where: { campaignId }, _min: { position: true } });
+    await tx.campaignImage.updateMany({ where: { campaignId }, data: { selected: false } });
+    await tx.campaignImage.create({ data: { campaignId, ...image, selected: true, position: (first._min.position ?? 1) - 1 } });
     return { brandId: c.brandId, batchId: c.batchId };
   });
 }

@@ -14,8 +14,6 @@ import {
   brandForImages,
   campaignBrand,
   chooseCandidate,
-  deleteCampaignImage as storeDeleteCampaignImage,
-  reorderCampaignImages as storeReorderCampaignImages,
   reorderCampaigns as storeReorderCampaigns,
   saveBrandText as storeSaveBrandText,
   selectCampaignImage as storeSelectCampaignImage,
@@ -158,28 +156,6 @@ export async function reorderCampaigns(brandId: string, order: string[]): Promis
   const list = ids(order);
   if (!UUID.test(brandId) || !list) return MISSING;
   const written = await storeReorderCampaigns(scope, brandId, list);
-  if (!written) return MISSING;
-  refresh(written);
-  return { ok: true };
-}
-
-/** A campaign's images in the order dragged; the first usable one is the one used. */
-export async function reorderCampaignImages(campaignId: string, order: string[]): Promise<Result> {
-  const scope = await getTeamScope();
-  if (!scope || !scopeCan(scope, "batches:write")) return DENIED;
-  const list = ids(order);
-  if (!UUID.test(campaignId) || !list) return MISSING;
-  const written = await storeReorderCampaignImages(scope, campaignId, list);
-  if (!written) return MISSING;
-  refresh(written);
-  return { ok: true };
-}
-
-export async function deleteCampaignImage(campaignId: string, imageId: string): Promise<Result> {
-  const scope = await getTeamScope();
-  if (!scope || !scopeCan(scope, "batches:write")) return DENIED;
-  if (!UUID.test(campaignId) || !UUID.test(imageId)) return MISSING;
-  const written = await storeDeleteCampaignImage(scope, campaignId, imageId);
   if (!written) return MISSING;
   refresh(written);
   return { ok: true };
