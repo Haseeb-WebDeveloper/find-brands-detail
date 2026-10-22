@@ -13,9 +13,16 @@ const base: BrandRow = {
   fields: { website: null, instagram: null, tiktok: null, logo: null, cover: null },
   chosen: { website: null, instagram: null, tiktok: null, logo: null, cover: null },
   campaigns: { approved: 0, total: 0 },
+  stuck: false,
+  missingAi: { campaigns: false, details: false },
 };
 
 describe("progressText", () => {
+  it("says when research is stuck", () => {
+    expect(progressText({ ...base, status: "researching", currentStep: "website", stuck: true })).toBe("Stuck: research stopped without finishing");
+    expect(progressTone({ ...base, stuck: true })).toBe("red");
+  });
+
   it("describes each status", () => {
     expect(progressText(base)).toBe("Waiting to start");
     expect(progressText({ ...base, status: "researching", currentStep: "instagram" })).toBe("Checking Instagram (step 3 of 8)");

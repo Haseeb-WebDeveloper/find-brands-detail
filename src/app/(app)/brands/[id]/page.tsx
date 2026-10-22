@@ -16,6 +16,9 @@ import { RetryButton } from "./retry-button";
 import { getBrandDetail } from "@/lib/brands/scoped";
 import { progressText, progressTone } from "@/lib/brands/progress";
 import { RowsLoading } from "@/components/app/shell/page-skeletons";
+import { FillAiButton } from "@/components/app/research/fill-ai-button";
+import { aiAvailable } from "@/lib/ai/models";
+import { canFillAi } from "@/lib/research/ai-fill";
 
 export const metadata: Metadata = { title: "Brand" };
 
@@ -31,9 +34,13 @@ async function Brand({ params }: { params: Promise<{ id: string }> }) {
   const brand = await getBrandDetail(scope, id);
   if (!brand) notFound();
 
-  const researching = brand.status === "queued" || brand.status === "researching";
+  const busy = brand.status === "queued" || brand.status === "researching";
+  // Live research; a stuck brand isn't, and can be run again.
+  const researching = busy && !brand.stuck;
   // Reviewing waits for research: its steps replace candidates and campaigns as they finish.
-  const canEdit = scopeCan(scope, "batches:write") && !researching;
+  const canEdit = scopeCan(scope, "batches:write") && !busy;
+  const fill = scopeCan(scope, "batches:write") && aiAvailable() && canFillAi(brand.status, brand.missingAi);
+  const fillLabel = brand.missingAi.campaigns && brand.missingAi.details ? "Find campaigns and draft details" : brand.missingAi.campaigns ? "Find campaigns" : "Draft the missing details";
 
   return (
     <>
@@ -41,7 +48,7 @@ async function Brand({ params }: { params: Promise<{ id: string }> }) {
         title={brand.name}
         back={{ href: `/batches/${brand.batchId}`, label: "Batch" }}
         actions={
-          researching ? (
+          busy ? (
             <Pill tone={progressTone(brand)}>{progressText(brand)}</Pill>
           ) : (
             <ReviewBar brandId={brand.id} batchId={brand.batchId} siblings={brand.siblings} status={brand.status} canEdit={canEdit} />
@@ -58,7 +65,8 @@ async function Brand({ params }: { params: Promise<{ id: string }> }) {
         <div className="flex flex-col gap-3">
           <ResearchLog lines={brand.log} live={researching} defaultOpen={researching} />
           {scopeCan(scope, "batches:write") && !researching ? (
-            <div>
+            <div className="flex flex-wrap gap-2">
+              {fill ? <FillAiButton target={{ brandId: brand.id }} label={fillLabel} /> : null}
               <RetryButton brandId={brand.id} />
             </div>
           ) : null}

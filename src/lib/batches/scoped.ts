@@ -4,6 +4,7 @@ import { REVIEW_FIELDS, type ReviewField } from "@/lib/export/row";
 import { prisma } from "@/lib/prisma";
 import type { TeamScope } from "@/lib/auth/scope";
 import type { LogLevel } from "@/lib/research/log-types";
+import { missingAiParts, stuckBrandIds, type MissingAi } from "@/lib/research/ai-fill";
 
 export type BatchListItem = {
   id: string;
@@ -35,6 +36,10 @@ export type BrandRow = {
   /** The chosen value per field, with the follower count for the social accounts. */
   chosen: Record<ReviewField, { value: string; score: CandidateScore; followers: number | null } | null>;
   campaigns: { approved: number; total: number };
+  /** Queued or researching, but the batch hasn't moved in a long while: the job died. */
+  stuck: boolean;
+  /** What the AI makes that this brand is still missing. */
+  missingAi: MissingAi;
 };
 
 export type LogLine = { id: string; brandId: string; brandName: string; level: LogLevel; message: string; at: string };
@@ -79,7 +84,7 @@ export async function getBatch(
     prisma.brand.findMany({
       where: { batchId: id },
       orderBy: { createdAt: "asc" },
-      select: { id: true, name: true, status: true, currentStep: true, reviewCount: true, error: true },
+      select: { id: true, name: true, status: true, currentStep: true, reviewCount: true, error: true, updatedAt: true, text: true },
     }),
     prisma.selection.findMany({
       where: { brand: { batchId: id } },
@@ -95,10 +100,11 @@ export async function getBatch(
   ]);
   if (!batch) return null;
   const names = new Map(brands.map((b) => [b.id, b.name]));
+  const stuck = stuckBrandIds(brands, Date.now());
   return {
     id: batch.id,
     createdAt: batch.createdAt.toISOString(),
-    brands: brands.map((b) => {
+    brands: brands.map(({ updatedAt: _updatedAt, text, ...b }) => {
       const mine = selections.filter((x) => x.brandId === b.id);
       const camps = campaigns.filter((c) => c.brandId === b.id);
       const chosen = (f: ReviewField) => {
@@ -113,6 +119,8 @@ export async function getBatch(
         fields: Object.fromEntries(REVIEW_FIELDS.map((f) => [f, chosen(f)?.score ?? null])) as BrandRow["fields"],
         chosen: Object.fromEntries(REVIEW_FIELDS.map((f) => [f, chosen(f)])) as BrandRow["chosen"],
         campaigns: { approved: camps.filter((c) => c.status === "approved").length, total: camps.filter((c) => c.status !== "removed").length },
+        stuck: stuck.has(b.id),
+        missingAi: missingAiParts(camps.length, text),
       };
     }),
     log: log.map((l) => ({

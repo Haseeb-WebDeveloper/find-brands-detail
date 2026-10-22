@@ -13,6 +13,9 @@ import { ResearchLog } from "@/components/app/research/research-log";
 import { ProgressBar } from "@/components/app/research/progress-bar";
 import { BatchList } from "@/components/app/review/batch-list";
 import { ExportButton } from "@/components/app/review/export-dialog";
+import { FillAiButton } from "@/components/app/research/fill-ai-button";
+import { aiAvailable } from "@/lib/ai/models";
+import { canFillAi } from "@/lib/research/ai-fill";
 
 export const metadata: Metadata = { title: "Batch" };
 
@@ -24,7 +27,9 @@ async function Batch({ params }: { params: Promise<{ id: string }> }) {
   const batch = await getBatch(scope, id);
   if (!batch) notFound();
   const total = batch.brands.length;
-  const running = batch.brands.some((b) => b.status === "queued" || b.status === "researching");
+  const running = batch.brands.some((b) => (b.status === "queued" || b.status === "researching") && !b.stuck);
+  const stuck = batch.brands.filter((b) => b.stuck).length;
+  const toFill = scopeCan(scope, "batches:write") && aiAvailable() ? batch.brands.filter((b) => canFillAi(b.status, b.missingAi)).length : 0;
   const researched = batch.brands.filter((b) => b.status !== "queued" && b.status !== "researching").length;
   const reviewed = batch.brands.filter((b) => b.status === "approved" || b.status === "exported").length;
   const next = batch.brands.find((b) => b.status === "needs_review");
@@ -37,6 +42,7 @@ async function Batch({ params }: { params: Promise<{ id: string }> }) {
         back={{ href: "/", label: "Batches" }}
         actions={
           <div className="flex items-center gap-2">
+            {toFill > 0 && !running ? <FillAiButton target={{ batchId: batch.id }} label={`Fill in missing AI parts (${toFill})`} /> : null}
             {scopeCan(scope, "batches:write") ? <ExportButton brands={batch.brands.map((b) => ({ id: b.id, name: b.name, status: b.status }))} /> : null}
             {next ? (
               <Button kind="filled" href={`/brands/${next.id}`}>
@@ -52,6 +58,7 @@ async function Batch({ params }: { params: Promise<{ id: string }> }) {
           <p className="text-callout text-label-secondary">
             {total} brand{total === 1 ? "" : "s"}
             {running ? ` · ${researched} researched` : ""} · {reviewed} reviewed
+            {stuck > 0 ? <span className="text-system-red"> · {stuck} stuck: open {stuck === 1 ? "it" : "each"} and run research again</span> : null}
           </p>
           {running ? <ProgressBar done={researched} total={total} active /> : null}
         </div>

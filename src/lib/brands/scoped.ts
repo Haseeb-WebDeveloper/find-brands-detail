@@ -5,6 +5,7 @@ import type { TeamScope } from "@/lib/auth/scope";
 import type { PageFacts } from "@/lib/website/extract";
 import type { LogLine } from "@/lib/batches/scoped";
 import type { LogLevel } from "@/lib/research/log-types";
+import { missingAiParts, stuckBrandIds, type MissingAi } from "@/lib/research/ai-fill";
 
 export type CampaignCard = {
   id: string;
@@ -44,6 +45,10 @@ export type BrandDetail = {
   log: LogLine[];
   /** The batch's brands in order, for the pager and "Done → next". */
   siblings: { id: string; name: string; status: BrandStatus }[];
+  /** Queued or researching, but its batch hasn't moved in a long while: the job died. */
+  stuck: boolean;
+  /** What the AI makes that this brand is still missing. */
+  missingAi: MissingAi;
 };
 
 const FIELDS = ["website", "instagram", "tiktok", "logo", "cover"] as const;
@@ -61,7 +66,7 @@ export async function getBrandDetail(_scope: TeamScope, id: string): Promise<Bra
     prisma.brandPage.findMany({ where: { brandId: id }, orderBy: { fetchedAt: "asc" } }),
     prisma.researchLog.findMany({ where: { brandId: id }, orderBy: { createdAt: "desc" }, take: LOG_LINES }),
     prisma.campaign.findMany({ where: { brandId: id }, orderBy: { position: "asc" }, include: { images: { orderBy: [{ position: "asc" }, { id: "asc" }] } } }),
-    prisma.brand.findMany({ where: { batch: { brands: { some: { id } } } }, orderBy: { createdAt: "asc" }, select: { id: true, name: true, status: true } }),
+    prisma.brand.findMany({ where: { batch: { brands: { some: { id } } } }, orderBy: { createdAt: "asc" }, select: { id: true, name: true, status: true, updatedAt: true } }),
   ]);
   if (!base) return null;
   const brand = { ...base, candidates, selections, pages, logs, campaigns };
@@ -113,7 +118,9 @@ export async function getBrandDetail(_scope: TeamScope, id: string): Promise<Bra
       industry: brand.text?.industry ?? "",
       regions: brand.text?.regions ?? "",
     },
-    siblings,
+    siblings: siblings.map(({ id, name, status }) => ({ id, name, status })),
+    stuck: stuckBrandIds(siblings, Date.now()).has(brand.id),
+    missingAi: missingAiParts(brand.campaigns.length, brand.text),
     log: brand.logs.map((l) => ({ id: l.id, brandId: l.brandId, brandName: brand.name, level: l.level as LogLevel, message: l.message, at: l.createdAt.toISOString() })),
   };
 }

@@ -4,6 +4,7 @@ import { broadcast } from "@/lib/realtime/broadcast";
 import { BRAND_EVENTS, batchTopic, brandTopic, type BrandChangedPayload } from "@/lib/realtime/channels";
 import type { ResearchStepId } from "@/lib/research/steps";
 import type { TeamScope } from "@/lib/auth/scope";
+import { canFillAi, missingAiParts } from "@/lib/research/ai-fill";
 
 /** A reviewer re-queues a brand: back to `queued`, error cleared. The job replaces old results. */
 export async function resetForRetry(_scope: TeamScope, brandId: string): Promise<{ batchId: string } | null> {
@@ -12,6 +13,23 @@ export async function resetForRetry(_scope: TeamScope, brandId: string): Promise
   await prisma.brand.update({ where: { id: brandId }, data: { status: "queued", currentStep: null, error: null } });
   await announce(brandId, brand.batchId, null);
   return brand;
+}
+
+/**
+ * Queues "fill in missing AI parts" for the given brands (or every brand of a batch), keeping only
+ * those it applies to (canFillAi, checked here again, not trusted from the page). Returns the brands
+ * queued and their batches.
+ */
+export async function queueAiFill(_scope: TeamScope, where: { brandId: string } | { batchId: string }): Promise<{ ids: string[]; batchIds: string[] }> {
+  const brands = await prisma.brand.findMany({
+    where: "brandId" in where ? { id: where.brandId } : { batchId: where.batchId },
+    select: { id: true, batchId: true, status: true, text: true, _count: { select: { campaigns: true } } },
+  });
+  const eligible = brands.filter((b) => canFillAi(b.status, missingAiParts(b._count.campaigns, b.text)));
+  if (eligible.length === 0) return { ids: [], batchIds: [] };
+  await prisma.brand.updateMany({ where: { id: { in: eligible.map((b) => b.id) } }, data: { status: "queued", currentStep: null, error: null } });
+  for (const b of eligible) await announce(b.id, b.batchId, null);
+  return { ids: eligible.map((b) => b.id), batchIds: [...new Set(eligible.map((b) => b.batchId))] };
 }
 
 /** The functions below are called only by the research job (Inngest), so they take no scope. */

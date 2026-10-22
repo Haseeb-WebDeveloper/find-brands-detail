@@ -19,6 +19,7 @@ function Handle({ value }: { value: BrandRow["chosen"]["instagram"] }) {
 
 function Status({ b }: { b: BrandRow }) {
   if (b.error) return <span className="text-subhead text-system-red">Stopped</span>;
+  if (b.stuck) return <span className="text-subhead text-system-red">Stuck</span>;
   if (b.status === "queued") return <span className="text-subhead text-label-tertiary">Waiting</span>;
   if (b.status === "researching") {
     const step = RESEARCH_STEPS.find((s) => s.id === b.currentStep);
