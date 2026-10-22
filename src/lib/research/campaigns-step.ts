@@ -62,7 +62,11 @@ export async function runCampaignsStep(brandId: string, log: ResearchLog): Promi
           sourceUrls: { date: c.date, note: c.descriptionNote, urls: c.sources },
           status: "proposed",
           images: {
-            create: c.images.map(({ candidate, verdict }) => ({
+            // The chosen image first: the first usable image is the one used (review/store.ts).
+            create: [...c.images]
+              .sort((a, b) => Number(b.candidate === c.chosen) - Number(a.candidate === c.chosen))
+              .map(({ candidate, verdict }, position) => ({
+              position,
               url: candidate.url,
               sourceKind: candidate.source.kind === "third_party" ? "third_party" : "brand",
               width: candidate.check.width ?? null,

@@ -189,6 +189,8 @@ model CampaignImage {
   score      CandidateScore
   reason     String
   selected   Boolean         @default(false)
+  /// The reviewer's order of a campaign's images (dragged in the editor).
+  position   Int             @default(0)
 
   @@index([campaignId])
   @@map("campaign_images")

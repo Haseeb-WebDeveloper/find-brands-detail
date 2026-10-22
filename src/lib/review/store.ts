@@ -107,44 +107,75 @@ export async function setCampaignStatus(_scope: TeamScope, campaignId: string, s
   });
 }
 
-/** Swaps the campaign with its neighbour above (-1) or below (+1); the order is the export's slot order. */
-export async function moveCampaign(_scope: TeamScope, campaignId: string, by: -1 | 1): Promise<Written> {
-  return prisma.$transaction(async (tx) => {
-    const c = await campaignOwner(tx, campaignId);
-    if (!c) return null;
-    const neighbour = await tx.campaign.findFirst({
-      where: { brandId: c.brandId, position: by < 0 ? { lt: c.position } : { gt: c.position } },
-      orderBy: { position: by < 0 ? "desc" : "asc" },
-      select: { id: true, position: true },
-    });
-    if (neighbour) {
-      await tx.campaign.update({ where: { id: neighbour.id }, data: { position: c.position } });
-      await tx.campaign.update({ where: { id: campaignId }, data: { position: neighbour.position } });
-    }
-    return { brandId: c.brandId, batchId: c.batchId };
-  });
+/**
+ * A campaign's images in the reviewer's order. THE FIRST USABLE ONE IS THE ONE USED (and exported):
+ * dragging an image to the front, or choosing it, makes it the campaign's image. `ids` not given keep
+ * their order after the given ones.
+ */
+async function orderImages(tx: Tx, campaignId: string, ids: string[]) {
+  const images = await tx.campaignImage.findMany({ where: { campaignId }, orderBy: [{ position: "asc" }, { id: "asc" }], select: { id: true, score: true } });
+  const known = new Set(images.map((i) => i.id));
+  const order = [...ids.filter((id) => known.has(id)), ...images.map((i) => i.id).filter((id) => !ids.includes(id))];
+  const used = order.find((id) => images.find((i) => i.id === id)?.score !== "rejected") ?? null;
+  for (const [position, id] of order.entries()) {
+    await tx.campaignImage.update({ where: { id }, data: { position, selected: id === used } });
+  }
 }
 
+/** "Use this image": it moves to the front. */
 export async function selectCampaignImage(_scope: TeamScope, campaignId: string, imageId: string): Promise<Written> {
   return prisma.$transaction(async (tx) => {
     const c = await campaignOwner(tx, campaignId);
     const image = await tx.campaignImage.findFirst({ where: { id: imageId, campaignId }, select: { id: true } });
     if (!c || !image) return null;
-    await tx.campaignImage.updateMany({ where: { campaignId }, data: { selected: false } });
-    await tx.campaignImage.update({ where: { id: imageId }, data: { selected: true } });
+    await orderImages(tx, campaignId, [imageId]);
     return { brandId: c.brandId, batchId: c.batchId };
+  });
+}
+
+export async function reorderCampaignImages(_scope: TeamScope, campaignId: string, ids: string[]): Promise<Written> {
+  return prisma.$transaction(async (tx) => {
+    const c = await campaignOwner(tx, campaignId);
+    if (!c) return null;
+    await orderImages(tx, campaignId, ids);
+    return { brandId: c.brandId, batchId: c.batchId };
+  });
+}
+
+/** Removes one image; if it was the one used, the next in order takes its place. */
+export async function deleteCampaignImage(_scope: TeamScope, campaignId: string, imageId: string): Promise<Written> {
+  return prisma.$transaction(async (tx) => {
+    const c = await campaignOwner(tx, campaignId);
+    const image = await tx.campaignImage.findFirst({ where: { id: imageId, campaignId }, select: { id: true } });
+    if (!c || !image) return null;
+    await tx.campaignImage.delete({ where: { id: imageId } });
+    await orderImages(tx, campaignId, []);
+    return { brandId: c.brandId, batchId: c.batchId };
+  });
+}
+
+/** The brand's campaigns in the order dragged; the order is the export's slot order. */
+export async function reorderCampaigns(_scope: TeamScope, brandId: string, ids: string[]): Promise<Written> {
+  return prisma.$transaction(async (tx) => {
+    const found = await owner(tx, brandId);
+    if (!found) return null;
+    const campaigns = await tx.campaign.findMany({ where: { brandId }, orderBy: { position: "asc" }, select: { id: true } });
+    const known = new Set(campaigns.map((x) => x.id));
+    const order = [...ids.filter((id) => known.has(id)), ...campaigns.map((x) => x.id).filter((id) => !ids.includes(id))];
+    for (const [i, id] of order.entries()) await tx.campaign.update({ where: { id }, data: { position: i + 1 } });
+    return found;
   });
 }
 
 export type CheckedImage = { url: string; sourceKind: "brand" | "third_party"; width: number | null; height: number | null; score: CandidateScore; reason: string };
 
-/** A reviewer's image for a campaign, already checked; it becomes the selected one. */
+/** A reviewer's image for a campaign, already checked; it goes to the front, so it's the one used. */
 export async function addCampaignImage(_scope: TeamScope, campaignId: string, image: CheckedImage): Promise<Written> {
   return prisma.$transaction(async (tx) => {
     const c = await campaignOwner(tx, campaignId);
     if (!c) return null;
-    await tx.campaignImage.updateMany({ where: { campaignId }, data: { selected: false } });
-    await tx.campaignImage.create({ data: { campaignId, ...image, selected: true } });
+    const created = await tx.campaignImage.create({ data: { campaignId, ...image, selected: false, position: -1 }, select: { id: true } });
+    await orderImages(tx, campaignId, [created.id]);
     return { brandId: c.brandId, batchId: c.batchId };
   });
 }

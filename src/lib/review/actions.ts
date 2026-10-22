@@ -14,7 +14,9 @@ import {
   brandForImages,
   campaignBrand,
   chooseCandidate,
-  moveCampaign as storeMoveCampaign,
+  deleteCampaignImage as storeDeleteCampaignImage,
+  reorderCampaignImages as storeReorderCampaignImages,
+  reorderCampaigns as storeReorderCampaigns,
   saveBrandText as storeSaveBrandText,
   selectCampaignImage as storeSelectCampaignImage,
   setBrandStatus,
@@ -147,11 +149,37 @@ export async function setCampaignStatus(campaignId: string, status: "approved" |
   return { ok: true };
 }
 
-export async function moveCampaign(campaignId: string, by: -1 | 1): Promise<Result> {
+const ids = (list: unknown): string[] | null => (Array.isArray(list) && list.length <= 50 && list.every((x) => typeof x === "string" && UUID.test(x)) ? list : null);
+
+/** The brand's campaigns in the order dragged (the export's slot order). */
+export async function reorderCampaigns(brandId: string, order: string[]): Promise<Result> {
   const scope = await getTeamScope();
   if (!scope || !scopeCan(scope, "batches:write")) return DENIED;
-  if (!UUID.test(campaignId) || (by !== -1 && by !== 1)) return MISSING;
-  const written = await storeMoveCampaign(scope, campaignId, by);
+  const list = ids(order);
+  if (!UUID.test(brandId) || !list) return MISSING;
+  const written = await storeReorderCampaigns(scope, brandId, list);
+  if (!written) return MISSING;
+  refresh(written);
+  return { ok: true };
+}
+
+/** A campaign's images in the order dragged; the first usable one is the one used. */
+export async function reorderCampaignImages(campaignId: string, order: string[]): Promise<Result> {
+  const scope = await getTeamScope();
+  if (!scope || !scopeCan(scope, "batches:write")) return DENIED;
+  const list = ids(order);
+  if (!UUID.test(campaignId) || !list) return MISSING;
+  const written = await storeReorderCampaignImages(scope, campaignId, list);
+  if (!written) return MISSING;
+  refresh(written);
+  return { ok: true };
+}
+
+export async function deleteCampaignImage(campaignId: string, imageId: string): Promise<Result> {
+  const scope = await getTeamScope();
+  if (!scope || !scopeCan(scope, "batches:write")) return DENIED;
+  if (!UUID.test(campaignId) || !UUID.test(imageId)) return MISSING;
+  const written = await storeDeleteCampaignImage(scope, campaignId, imageId);
   if (!written) return MISSING;
   refresh(written);
   return { ok: true };

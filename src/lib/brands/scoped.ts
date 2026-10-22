@@ -60,7 +60,7 @@ export async function getBrandDetail(_scope: TeamScope, id: string): Promise<Bra
     prisma.selection.findMany({ where: { brandId: id, field: { in: [...FIELDS] } } }),
     prisma.brandPage.findMany({ where: { brandId: id }, orderBy: { fetchedAt: "asc" } }),
     prisma.researchLog.findMany({ where: { brandId: id }, orderBy: { createdAt: "desc" }, take: LOG_LINES }),
-    prisma.campaign.findMany({ where: { brandId: id }, orderBy: { position: "asc" }, include: { images: true } }),
+    prisma.campaign.findMany({ where: { brandId: id }, orderBy: { position: "asc" }, include: { images: { orderBy: [{ position: "asc" }, { id: "asc" }] } } }),
     prisma.brand.findMany({ where: { batch: { brands: { some: { id } } } }, orderBy: { createdAt: "asc" }, select: { id: true, name: true, status: true } }),
   ]);
   if (!base) return null;

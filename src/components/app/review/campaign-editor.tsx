@@ -2,16 +2,30 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
+import { SortableContext, arrayMove, horizontalListSortingStrategy, rectSortingStrategy, useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { Dialog } from "@/design/dialog";
 import { TextField } from "@/design/text-field";
 import { useToast } from "@/design/toast";
 import { cn } from "@/design/cn";
 import type { CampaignCard } from "@/lib/brands/scoped";
 import { ImageViewer } from "@/components/app/review/image-viewer";
-import { addCampaign, addCampaignImage, saveCampaign, selectCampaignImage, setCampaignStatus } from "@/lib/review/actions";
+import {
+  addCampaign,
+  addCampaignImage,
+  deleteCampaignImage,
+  reorderCampaignImages,
+  reorderCampaigns,
+  saveCampaign,
+  selectCampaignImage,
+  setCampaignStatus,
+} from "@/lib/review/actions";
 
 /** The DB importer's limit. */
 const MAX = 500;
+
+type Image = CampaignCard["images"][number];
 
 function useRun() {
   const router = useRouter();
@@ -26,6 +40,25 @@ function useRun() {
       router.refresh();
     });
   return [pending, run] as const;
+}
+
+/**
+ * A drag starts after the pointer moves a few pixels, so a tap or click on a tile still works. No
+ * keyboard dragging: its Space/Enter would swallow the keyboard presses of the buttons inside a tile.
+ */
+function useDragSensors() {
+  return useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+}
+
+/**
+ * A list the reviewer reorders by dragging, shown in its new order at once while the server catches up;
+ * the server's order takes over whenever the list itself changes (an add, a delete, a refresh).
+ */
+function useOrder(ids: string[]) {
+  const key = ids.join(",");
+  const [order, setOrder] = useState({ key, ids });
+  if (order.key !== key && order.ids.join(",") !== key) setOrder({ key, ids });
+  return [order.key === key || order.ids.join(",") === key ? order.ids : ids, (next: string[]) => setOrder({ key, ids: next })] as const;
 }
 
 function Description({ value, onChange }: { value: string; onChange: (v: string) => void }) {
@@ -46,12 +79,62 @@ function Description({ value, onChange }: { value: string; onChange: (v: string)
   );
 }
 
-/** Title, description and image of one campaign, in a dialog over the brand. */
+/** One of a campaign's images in the edit dialog: drag to reorder, click to use, × to delete. */
+function SortableImage({ image, used, busy, onUse, onDelete }: { image: Image; used: boolean; busy: boolean; onUse: () => void; onDelete: () => void }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: image.id, disabled: busy });
+  return (
+    <div
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      className={cn("group relative w-20 shrink-0 touch-none", isDragging && "z-10 opacity-80")}
+      {...attributes}
+      {...listeners}
+    >
+      <button
+        type="button"
+        disabled={busy || image.score === "rejected"}
+        title={`${image.reason}${image.score !== "rejected" && !used ? " — click to use this image" : ""}`}
+        onClick={onUse}
+        className={cn("block w-full cursor-grab overflow-hidden rounded-md active:cursor-grabbing", used ? "ring-2 ring-tint" : "opacity-85 hover:opacity-100", image.score === "rejected" && "opacity-30")}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={image.url} alt="" loading="lazy" referrerPolicy="no-referrer" draggable={false} className="aspect-[200/236] w-full bg-fill object-cover" />
+      </button>
+      {used ? <span className="absolute bottom-1 left-1 rounded bg-tint px-1.5 text-caption font-medium text-tint-contrast">Used</span> : null}
+      <button
+        type="button"
+        disabled={busy}
+        aria-label="Delete this image"
+        title="Delete this image"
+        onClick={onDelete}
+        className="absolute top-1 right-1 grid size-6 place-items-center rounded-full bg-black/60 text-callout leading-none text-white opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+      >
+        ×
+      </button>
+    </div>
+  );
+}
+
+/** Title, description and images of one campaign, in a dialog over the brand. */
 function EditDialog({ c, open, onOpenChange }: { c: CampaignCard; open: boolean; onOpenChange: (open: boolean) => void }) {
   const [pending, run] = useRun();
   const [title, setTitle] = useState(c.title);
   const [description, setDescription] = useState(c.description);
   const [imageUrl, setImageUrl] = useState("");
+  const sensors = useDragSensors();
+  const [order, setOrder] = useOrder(c.images.map((i) => i.id));
+  const byId = new Map(c.images.map((i) => [i.id, i]));
+  const images = order.map((id) => byId.get(id)).filter((i): i is Image => Boolean(i));
+  // The first usable image is the one used (review/store.ts).
+  const usedId = images.find((i) => i.score !== "rejected")?.id ?? null;
+
+  const onDragEnd = ({ active, over }: DragEndEvent) => {
+    if (!over || active.id === over.id) return;
+    const next = arrayMove(order, order.indexOf(String(active.id)), order.indexOf(String(over.id)));
+    setOrder(next);
+    run(() => reorderCampaignImages(c.id, next));
+  };
+
   return (
     <Dialog
       open={open}
@@ -66,24 +149,32 @@ function EditDialog({ c, open, onOpenChange }: { c: CampaignCard; open: boolean;
       <div className="flex flex-col gap-3">
         <TextField label="Title" value={title} onChange={(e) => setTitle(e.currentTarget.value)} />
         <Description value={description} onChange={setDescription} />
-        {c.images.length > 0 ? (
+        {images.length > 0 ? (
           <div className="flex flex-col gap-1.5">
-            <span className="text-subhead text-label-secondary">Image</span>
-            <div className="flex flex-wrap gap-2">
-              {c.images.map((i) => (
-                <button
-                  key={i.id}
-                  type="button"
-                  disabled={pending || i.score === "rejected"}
-                  title={i.reason}
-                  onClick={() => run(() => selectCampaignImage(c.id, i.id))}
-                  className={cn("overflow-hidden rounded-md", i.selected ? "ring-2 ring-tint" : "opacity-80 hover:opacity-100", i.score === "rejected" && "opacity-30")}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={i.url} alt="" loading="lazy" referrerPolicy="no-referrer" className="aspect-[200/236] w-20 bg-fill object-cover" />
-                </button>
-              ))}
-            </div>
+            <span className="text-subhead text-label-secondary">Images — drag to reorder; the first is used</span>
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+              <SortableContext items={order} strategy={horizontalListSortingStrategy}>
+                <div className="flex flex-wrap gap-2">
+                  {images.map((i) => (
+                    <SortableImage
+                      key={i.id}
+                      image={i}
+                      used={i.id === usedId}
+                      busy={pending}
+                      onUse={() => {
+                        if (i.id === usedId) return;
+                        setOrder([i.id, ...order.filter((id) => id !== i.id)]);
+                        run(() => selectCampaignImage(c.id, i.id));
+                      }}
+                      onDelete={() => {
+                        setOrder(order.filter((id) => id !== i.id));
+                        run(() => deleteCampaignImage(c.id, i.id), "Image deleted.");
+                      }}
+                    />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
           </div>
         ) : null}
         <div className="flex items-end gap-2">
@@ -111,47 +202,61 @@ function EditDialog({ c, open, onOpenChange }: { c: CampaignCard; open: boolean;
   );
 }
 
+/**
+ * One campaign tile: drag it to reorder, tap the image for full screen, the title to edit, ✓/+ to keep
+ * it in or leave it out. The dialog and the viewer render OUTSIDE the draggable element: React passes
+ * events up through portals, so a click inside them would otherwise start a drag of the tile.
+ */
 function Tile({ c, canEdit }: { c: CampaignCard; canEdit: boolean }) {
   const [pending, run] = useRun();
   const [editing, setEditing] = useState(false);
   const [viewing, setViewing] = useState(false);
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: c.id, disabled: !canEdit });
   const image = c.images.find((i) => i.selected) ?? null;
-  // The chosen image first, then the others that passed, for the full-screen viewer.
+  // The image used first, then the others that passed, for the full-screen viewer.
   const gallery = [...c.images.filter((i) => i.selected), ...c.images.filter((i) => !i.selected && i.score !== "rejected")];
   const out = c.status === "removed";
   return (
-    <div className={cn("group relative flex flex-col gap-2", out && "opacity-45")}>
-      {image ? (
-        <button type="button" onClick={() => setViewing(true)} className="cursor-zoom-in" aria-label={`View ${c.title} full screen`}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={image.url} alt="" loading="lazy" referrerPolicy="no-referrer" className="aspect-[200/236] w-full rounded-lg bg-fill object-cover" />
+    <>
+      <div
+        ref={setNodeRef}
+        style={{ transform: CSS.Transform.toString(transform), transition }}
+        className={cn("group relative flex touch-none flex-col gap-2", out && "opacity-45", isDragging && "z-10 scale-[1.03] opacity-90", canEdit && "cursor-grab active:cursor-grabbing")}
+        {...attributes}
+        {...listeners}
+      >
+        {image ? (
+          <button type="button" onClick={() => setViewing(true)} className="cursor-zoom-in" aria-label={`View ${c.title} full screen`}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={image.url} alt="" loading="lazy" referrerPolicy="no-referrer" draggable={false} className="aspect-[200/236] w-full rounded-lg bg-fill object-cover" />
+          </button>
+        ) : (
+          <button type="button" disabled={!canEdit} onClick={() => setEditing(true)} className="flex aspect-[200/236] w-full items-center justify-center rounded-lg bg-fill text-footnote text-label-tertiary">
+            No image
+          </button>
+        )}
+        <button type="button" disabled={!canEdit} onClick={() => setEditing(true)} className="line-clamp-2 text-left text-callout text-label hover:underline" title={canEdit ? "Edit" : undefined}>
+          {c.title}
         </button>
-      ) : (
-        <button type="button" disabled={!canEdit} onClick={() => setEditing(true)} className="flex aspect-[200/236] w-full items-center justify-center rounded-lg bg-fill text-footnote text-label-tertiary">
-          No image
-        </button>
-      )}
-      <button type="button" disabled={!canEdit} onClick={() => setEditing(true)} className="line-clamp-2 text-left text-callout text-label hover:underline" title={canEdit ? "Edit" : undefined}>
-        {c.title}
-      </button>
+        {canEdit ? (
+          <button
+            type="button"
+            disabled={pending}
+            aria-label={out ? `Put ${c.title} back in` : `Leave ${c.title} out`}
+            title={out ? "Put back in" : "Leave out"}
+            onClick={() => run(() => setCampaignStatus(c.id, out ? "proposed" : "removed"))}
+            className={cn(
+              "absolute top-2 right-2 flex size-8 items-center justify-center rounded-full text-callout font-semibold shadow-sm",
+              out ? "bg-surface text-label-secondary" : "bg-system-green text-white",
+            )}
+          >
+            {out ? "+" : "✓"}
+          </button>
+        ) : null}
+      </div>
       {viewing ? <ImageViewer images={gallery.map((i) => ({ url: i.url, caption: c.title }))} start={0} onClose={() => setViewing(false)} /> : null}
-      {canEdit ? (
-        <button
-          type="button"
-          disabled={pending}
-          aria-label={out ? `Put ${c.title} back in` : `Leave ${c.title} out`}
-          title={out ? "Put back in" : "Leave out"}
-          onClick={() => run(() => setCampaignStatus(c.id, out ? "proposed" : "removed"))}
-          className={cn(
-            "absolute top-2 right-2 flex size-8 items-center justify-center rounded-full text-callout font-semibold shadow-sm",
-            out ? "bg-surface text-label-secondary" : "bg-system-green text-white",
-          )}
-        >
-          {out ? "+" : "✓"}
-        </button>
-      ) : null}
       {canEdit ? <EditDialog c={c} open={editing} onOpenChange={setEditing} /> : null}
-    </div>
+    </>
   );
 }
 
@@ -194,21 +299,42 @@ function AddTile({ brandId }: { brandId: string }) {
   );
 }
 
-/** Campaigns as tiles: ✓ in the export, + left out; a tile opens to edit its text or image. */
+/**
+ * Campaigns as tiles, in the export's order: drag a tile to move it; ✓ in the export, + left out; a
+ * tile's title opens it to edit its text and images.
+ */
 export function CampaignEditor({ brandId, campaigns, canEdit }: { brandId: string; campaigns: CampaignCard[]; canEdit: boolean }) {
+  const [, run] = useRun();
+  const sensors = useDragSensors();
+  const [order, setOrder] = useOrder(campaigns.map((c) => c.id));
+  const byId = new Map(campaigns.map((c) => [c.id, c]));
+  const ordered = order.map((id) => byId.get(id)).filter((c): c is CampaignCard => Boolean(c));
   const included = campaigns.filter((c) => c.status !== "removed").length;
+
+  const onDragEnd = ({ active, over }: DragEndEvent) => {
+    if (!over || active.id === over.id) return;
+    const next = arrayMove(order, order.indexOf(String(active.id)), order.indexOf(String(over.id)));
+    setOrder(next);
+    run(() => reorderCampaigns(brandId, next));
+  };
+
   return (
     <section className="flex flex-col gap-3">
       <h2 className="flex items-baseline gap-2 text-headline text-label">
         Campaigns
         <span className={cn("text-subhead font-normal", included < 3 ? "text-system-orange" : "text-label-secondary")}>{included} in</span>
+        {canEdit && campaigns.length > 1 ? <span className="text-footnote font-normal text-label-tertiary">· drag to reorder</span> : null}
       </h2>
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-4">
-        {campaigns.map((c) => (
-          <Tile key={c.id} c={c} canEdit={canEdit} />
-        ))}
-        {canEdit ? <AddTile brandId={brandId} /> : null}
-      </div>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+        <SortableContext items={order} strategy={rectSortingStrategy}>
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-4">
+            {ordered.map((c) => (
+              <Tile key={c.id} c={c} canEdit={canEdit} />
+            ))}
+            {canEdit ? <AddTile brandId={brandId} /> : null}
+          </div>
+        </SortableContext>
+      </DndContext>
     </section>
   );
 }
