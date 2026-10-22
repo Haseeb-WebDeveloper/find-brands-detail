@@ -81,6 +81,8 @@ function EditDialog({ c, open, onOpenChange }: { c: CampaignCard; open: boolean;
   const [title, setTitle] = useState(c.title);
   const [description, setDescription] = useState(c.description);
   const [imageUrl, setImageUrl] = useState("");
+  // The image open full screen, by its place in `images`.
+  const [viewing, setViewing] = useState<number | null>(null);
   // The one used, then the others as suggestions to pick from. Rejected images aren't offered.
   const used = c.images.find((i) => i.selected) ?? null;
   const images = c.images.filter((i) => i.score !== "rejected");
@@ -88,7 +90,8 @@ function EditDialog({ c, open, onOpenChange }: { c: CampaignCard; open: boolean;
   return (
     <Dialog
       open={open}
-      onOpenChange={onOpenChange}
+      // The full-screen viewer sits outside the dialog: a click or Escape there must not close the dialog.
+      onOpenChange={(next) => (next || viewing === null ? onOpenChange(next) : undefined)}
       title="Edit campaign"
       confirm={pending ? "Saving…" : "Save"}
       busy={pending || description.trim().length > MAX}
@@ -101,26 +104,52 @@ function EditDialog({ c, open, onOpenChange }: { c: CampaignCard; open: boolean;
         <Description value={description} onChange={setDescription} />
         {images.length > 0 ? (
           <div className="flex flex-col gap-1.5">
-            <span className="text-subhead text-label-secondary">Image — click another to use it instead</span>
+            <span className="text-subhead text-label-secondary">Image — click one to see it full screen</span>
             <div className="flex flex-wrap gap-2">
-              {images.map((i) => {
+              {images.map((i, n) => {
                 const isUsed = i.id === used?.id;
                 return (
-                  <button
-                    key={i.id}
-                    type="button"
-                    disabled={pending || isUsed}
-                    title={i.reason}
-                    onClick={() => run(() => selectCampaignImage(c.id, i.id))}
-                    className={cn("relative w-20 shrink-0 overflow-hidden rounded-md", isUsed ? "ring-2 ring-tint" : "opacity-75 hover:opacity-100")}
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={i.url} alt="" loading="lazy" referrerPolicy="no-referrer" className="aspect-[200/236] w-full bg-fill object-cover" />
-                    {isUsed ? <span className="absolute bottom-1 left-1 rounded bg-tint px-1.5 text-caption font-medium text-tint-contrast">Used</span> : null}
-                  </button>
+                  <div key={i.id} className="flex w-20 shrink-0 flex-col gap-1">
+                    <button
+                      type="button"
+                      title={i.reason}
+                      aria-label="View full screen"
+                      onClick={() => setViewing(n)}
+                      className={cn("block cursor-zoom-in overflow-hidden rounded-md", isUsed && "ring-2 ring-tint")}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={i.url} alt="" loading="lazy" referrerPolicy="no-referrer" className="aspect-[200/236] w-full bg-fill object-cover" />
+                    </button>
+                    {isUsed ? (
+                      <span className="rounded bg-tint py-0.5 text-center text-caption font-medium text-tint-contrast">Used</span>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={pending}
+                        onClick={() => run(() => selectCampaignImage(c.id, i.id))}
+                        className="rounded bg-fill py-0.5 text-caption font-medium text-label hover:bg-fill-strong disabled:opacity-50"
+                      >
+                        Use
+                      </button>
+                    )}
+                  </div>
                 );
               })}
             </div>
+            {viewing !== null ? (
+              <ImageViewer
+                images={images.map((i) => ({ url: i.url, caption: c.title }))}
+                start={viewing}
+                onClose={() => setViewing(null)}
+                action={{
+                  label: "Use this image",
+                  doneLabel: "Used",
+                  busy: pending,
+                  done: (n) => images[n]?.id === used?.id,
+                  onPress: (n) => run(() => selectCampaignImage(c.id, images[n].id), "Image chosen."),
+                }}
+              />
+            ) : null}
           </div>
         ) : null}
         <div className="flex items-end gap-2">
