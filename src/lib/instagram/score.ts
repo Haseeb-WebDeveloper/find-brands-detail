@@ -41,9 +41,27 @@ const followers = (c: IgCandidate) => (c.discovery.ok ? c.discovery.profile.foll
 const fromGlobal = (c: IgCandidate) => c.foundOn.some((f) => f.region === "global");
 const namedGlobal = (c: IgCandidate) => (c.discovery.ok ? /global/i.test(`${c.discovery.profile.name ?? ""} ${c.handle}`) : false);
 
-/** Global-site link first, then a "Global" name, then followers (Global Constraints). */
+/** A region as a word in the display name: "Brand USA", "Brand Korea". */
+const REGION_IN_NAME = /\b(usa|america|korea|japan|china|europe|france|germany|canada|australia|india|singapore|malaysia|thailand|vietnam|indonesia|taiwan|mexico|brasil|brazil|mena|latam)\b/i;
+/** A region run into a handle (@brandkorea_official): only long names, which don't hide inside other words. */
+const REGION_IN_HANDLE = /korea|japan|america|europe|canada|australia|singapore|malaysia|thailand|vietnam|indonesia|taiwan|mexico|brasil|brazil/i;
+/** A two-letter (or "usa") code ending a handle, alone or before "official": @brand_us, @brand.kr, @brand_us_official. */
+const REGION_CODE = /[._](us|usa|kr|jp|cn|uk|eu|fr|de|ca|au|in|sg|my|th|vn|ph|id|tw|hk|mx|br|uae|ksa)([._]official)?$/i;
+
+/** A regional account: a region in its handle or name, unless it also says "global". */
+export function namedRegional(c: IgCandidate): boolean {
+  if (namedGlobal(c)) return false;
+  const name = c.discovery.ok ? (c.discovery.profile.name ?? "") : "";
+  return REGION_CODE.test(c.handle) || REGION_IN_HANDLE.test(c.handle) || REGION_IN_NAME.test(name);
+}
+
+/**
+ * Global-site link first, then a "Global" name, then not named for one region, then followers
+ * (Global Constraints: prefer the global account). The region check keeps a big regional account
+ * (@brand_kr) from winning on followers over the brand's main one.
+ */
 export function chooseInstagram(scored: { candidate: IgCandidate; verdict: IgVerdict }[]): IgCandidate | null {
-  const rank = (c: IgCandidate) => [fromGlobal(c) ? 0 : 1, namedGlobal(c) ? 0 : 1, -followers(c)];
+  const rank = (c: IgCandidate) => [fromGlobal(c) ? 0 : 1, namedGlobal(c) ? 0 : 1, namedRegional(c) ? 1 : 0, -followers(c)];
   const better = (a: IgCandidate, b: IgCandidate) => {
     const [x, y] = [rank(a), rank(b)];
     for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) return x[i] < y[i];
