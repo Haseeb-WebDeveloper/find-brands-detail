@@ -2,7 +2,7 @@
  * The rules behind AI usage: what a call's outcome is, what the provider's rate-limit headers say,
  * and the totals the Usage page shows. Pure, so they're tested without a database.
  *
- * DAYS ARE UTC. Groq's and Gemini's daily limits don't reset at the team's midnight, and a fixed zone
+ * DAYS ARE UTC. Groq's daily limits don't reset at the team's midnight, and a fixed zone
  * keeps the server and the page agreeing on which day a call belongs to.
  */
 
@@ -167,4 +167,50 @@ export function summarizeUsage(rows: UsageRow[], { recentHits = 20 } = {}): Usag
     perBrand,
     limitHits: hits.reverse().slice(0, recentHits),
   };
+}
+
+/**
+ * Until when a key that refused a call for its limit should be left alone: what Groq says (its
+ * `retry-after` header, or "Please try again in 1m26.4s" in the message), else a guess by the limit:
+ * a minute for a per-minute limit, half an hour for a daily one. Never past six hours, so a key
+ * whose message was misread is tried again the same day.
+ */
+export function restUntil(hit: { createdAt: Date; error: string | null; rateHeaders: unknown }): Date {
+  const headers = (hit.rateHeaders ?? {}) as Record<string, string>;
+  const header = Number.parseFloat(headers["retry-after"] ?? "");
+  const said = Number.isFinite(header) && header > 0 ? header : waitInMessage(hit.error);
+  const kind = limitKind(hit.error);
+  const guess = kind?.endsWith("minute") ? 60 : kind ? 30 * 60 : 120;
+  const seconds = Math.min(6 * 3600, Math.max(5, said ?? guess));
+  return new Date(hit.createdAt.getTime() + seconds * 1000);
+}
+
+/** "try again in 1h2m3.5s" / "in 450ms" → seconds; null when the message names no wait. */
+function waitInMessage(error: string | null): number | null {
+  const m = error?.match(/try again in ((?:\d+(?:\.\d+)?(?:h|ms|m|s))+)/i);
+  if (!m) return null;
+  let seconds = 0;
+  for (const [, n, unit] of m[1].matchAll(/(\d+(?:\.\d+)?)(h|ms|m|s)/gi)) {
+    const v = Number(n);
+    seconds += unit === "h" ? v * 3600 : unit === "m" ? v * 60 : unit === "ms" ? v / 1000 : v;
+  }
+  return seconds;
+}
+
+/**
+ * The keys resting now, each until when: the latest refusal of each key, unless the key has answered
+ * since. Read from every recorded call, so parallel jobs on separate servers share what they learn.
+ */
+export function restingKeys(calls: { provider: string; outcome: string; createdAt: Date; error: string | null; rateHeaders: unknown }[], now: Date): Map<string, Date> {
+  const latest = new Map<string, (typeof calls)[number]>();
+  for (const c of [...calls].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())) {
+    if (c.outcome === "limit" || c.outcome === "answered" || c.outcome === "unusable") latest.set(c.provider, c);
+  }
+  const resting = new Map<string, Date>();
+  for (const [provider, c] of latest) {
+    if (c.outcome !== "limit") continue;
+    const until = restUntil(c);
+    if (until > now) resting.set(provider, until);
+  }
+  return resting;
 }

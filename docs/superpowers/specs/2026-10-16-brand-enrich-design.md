@@ -45,7 +45,7 @@ db-admin, image hosting (image URLs are kept as found).
 | Campaign definition | Anything with a distinct visual campaign: ambassadors, collaborations, seasonal campaigns, hero product launches with campaign imagery, pop-ups. Skip sales, retail expansion and promotions without imagery |
 | Campaign recency | No age limit; most recent first |
 | Campaign images | Brand-owned sources first (brand site, press pages, brand Instagram); any other source as a fallback, labelled third-party |
-| AI | Gemini with Google Search grounding for research; Groq or Gemini free tier for simple extraction. No Claude |
+| AI | Groq (free tier, `openai/gpt-oss-120b` with browser search) for research and writing, up to six keys in turn; no Gemini, no Claude (revised 2026-10-23) |
 | Instagram data | Meta Graph API Business Discovery through the existing Meta app ("Roofing"), plus the free crawler-page check for the verified badge |
 | TikTok data | Public profile page read directly (name, followers, badge, bio link); the brand Instagram bio page as a discovery source. A browser runner only if TikTok starts blocking (revised 2026-10-20) |
 | Hosting | Vercel (app), Supabase (database, Realtime), Inngest (jobs), GitHub Actions (browser runner) |

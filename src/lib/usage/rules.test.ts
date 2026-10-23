@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { errorHeaders, limitKind, rateLimitFrom, summarizeUsage, type UsageRow } from "./rules";
+import { errorHeaders, limitKind, rateLimitFrom, restUntil, restingKeys, summarizeUsage, type UsageRow } from "./rules";
 
 describe("rateLimitFrom", () => {
   it("keeps the rate-limit headers and reads the daily request pair", () => {
@@ -18,7 +18,7 @@ describe("rateLimitFrom", () => {
     });
   });
 
-  it("is empty when the provider sends none (Gemini)", () => {
+  it("is empty when the provider sends none", () => {
     expect(rateLimitFrom({ "content-type": "application/json" })).toEqual({ requestsLeft: null, requestsLimit: null, headers: null });
     expect(rateLimitFrom(undefined)).toEqual({ requestsLeft: null, requestsLimit: null, headers: null });
   });
@@ -103,5 +103,47 @@ describe("summarizeUsage", () => {
 
   it("has no average before any brand got an answer", () => {
     expect(summarizeUsage([]).perBrand).toBeNull();
+  });
+});
+
+describe("restUntil", () => {
+  const at = new Date("2026-10-23T04:00:00Z");
+  const after = (hit: { error: string | null; rateHeaders?: unknown }) => (restUntil({ createdAt: at, rateHeaders: null, ...hit }).getTime() - at.getTime()) / 1000;
+
+  it("waits as long as Groq says", () => {
+    expect(after({ error: "x", rateHeaders: { "retry-after": "26" } })).toBe(26);
+    expect(after({ error: "Rate limit reached … on tokens per day (TPD): Limit 200000, Used 199500. Please try again in 7m12.5s." })).toBeCloseTo(432.5);
+    expect(after({ error: "… on tokens per minute (TPM). Please try again in 450ms." })).toBe(5);
+  });
+
+  it("guesses by the limit when Groq doesn't say", () => {
+    expect(after({ error: "Rate limit reached on tokens per minute (TPM)" })).toBe(60);
+    expect(after({ error: "Rate limit reached on tokens per day (TPD)" })).toBe(1800);
+    expect(after({ error: "429" })).toBe(120);
+  });
+
+  it("never rests a key past six hours", () => {
+    expect(after({ error: "Please try again in 20h" })).toBe(6 * 3600);
+  });
+});
+
+describe("restingKeys", () => {
+  const now = new Date("2026-10-23T04:00:30Z");
+  const call = (provider: string, outcome: string, seconds: number, error: string | null = "on tokens per minute (TPM)") => ({
+    provider,
+    outcome,
+    createdAt: new Date(now.getTime() + seconds * 1000),
+    error,
+    rateHeaders: null,
+  });
+
+  it("rests a key from its last refusal until Groq's wait is over", () => {
+    const r = restingKeys([call("Groq", "limit", -10), call("Groq 2", "limit", -90), call("Groq 3", "answered", -5, null)], now);
+    expect([...r.keys()]).toEqual(["Groq"]);
+    expect(r.get("Groq")?.toISOString()).toBe("2026-10-23T04:01:20.000Z");
+  });
+
+  it("forgets a refusal once the key has answered since", () => {
+    expect(restingKeys([call("Groq", "limit", -20), call("Groq", "answered", -10, null)], now).size).toBe(0);
   });
 });

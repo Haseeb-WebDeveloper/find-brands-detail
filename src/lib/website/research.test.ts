@@ -93,7 +93,7 @@ describe("researchWebsite", () => {
     expect(d.findOfficialSites).not.toHaveBeenCalled();
   });
 
-  it("rejects a hijacked hint and attaches the archive, then asks Gemini", async () => {
+  it("rejects a hijacked hint and attaches the archive, then searches", async () => {
     const d = deps(
       {
         "https://pyunkangyul.us/": { finalUrl: "https://xoilaclivettbdu.tv/", html: real("live sport") },

@@ -1,14 +1,15 @@
 import "server-only";
 import { noLog, type ResearchLog } from "@/lib/research/log-types";
 import { currentAiBrand } from "@/lib/usage/context";
-import { errorHeaders, isQuotaError, rateLimitFrom, type AiOutcome } from "@/lib/usage/rules";
-import { recordAiCall } from "@/lib/usage/store";
+import { errorHeaders, isQuotaError, rateLimitFrom, restingKeys, type AiOutcome } from "@/lib/usage/rules";
+import { recentKeyCalls, recordAiCall } from "@/lib/usage/store";
 
 type Effort = "low" | "medium";
 
 /**
  * Groq keys in the order they're used: GROQ_API_KEY, then GROQ_API_KEY_2 to _6. Each has
- * its own quota, so one over its limit hands over to the next.
+ * its own quota, so one over its limit hands over to the next. Groq only (owner, 2026-10-23: no
+ * Gemini fallback).
  */
 const GROQ_KEY_VARS = ["GROQ_API_KEY", "GROQ_API_KEY_2", "GROQ_API_KEY_3", "GROQ_API_KEY_4", "GROQ_API_KEY_5", "GROQ_API_KEY_6"] as const;
 const groqKeys = () =>
@@ -19,11 +20,12 @@ const groqKeys = () =>
  * campaigns need one; every other step works without (spec 2026-10-21 §3).
  */
 export function aiAvailable(): boolean {
-  return groqKeys().length > 0 || Boolean(process.env.GOOGLE_GENERATIVE_AI_API_KEY);
+  return groqKeys().length > 0;
 }
+
 /** The keys this deployment has, by label, in the order they're tried (names only, never the keys). */
 export function configuredKeys(): string[] {
-  return [...groqKeys().map((k) => k.label), ...(process.env.GOOGLE_GENERATIVE_AI_API_KEY ? ["Gemini"] : [])];
+  return groqKeys().map((k) => k.label);
 }
 
 const TIMEOUT_MS = 120_000;
@@ -31,13 +33,40 @@ const message = (error: unknown) => (error instanceof Error ? error.message : St
 const isQuota = (error: unknown) => isQuotaError(message(error));
 
 /**
- * A model over its quota is skipped for a while instead of being asked again for every brand: each
- * refused call still costs half a minute (Gemini's free tier allows 20 searches a day).
+ * RESTING KEYS. A key that refused a call for its limit is left alone until Groq says it can answer
+ * again (usage/rules.ts `restUntil`): seconds for the per-minute token limit most refusals are, longer
+ * for the daily one. Worked out from the recorded calls, not kept in memory, so the jobs running on
+ * separate servers at once, and a later "Fill in missing AI parts", all see which keys are free now.
  */
-const COOLDOWN_MS = 30 * 60 * 1000;
-const restingUntil = new Map<string, number>();
-const resting = (label: string) => (restingUntil.get(label) ?? 0) > Date.now();
-const rest = (label: string) => restingUntil.set(label, Date.now() + COOLDOWN_MS);
+const REST_LOOKBACK_MS = 6 * 60 * 60 * 1000;
+/** Every key resting, but one free within this: wait for it rather than leave the work undone. */
+const WAIT_MAX_MS = 75_000;
+
+async function keyState(): Promise<{ ready: Model[]; soonest: { label: string; until: Date } | null }> {
+  const now = new Date();
+  const resting = restingKeys(await recentKeyCalls(new Date(now.getTime() - REST_LOOKBACK_MS)), now);
+  const all = groqKeys().map(groqModel);
+  const soonest = all
+    .filter((m) => resting.has(m.label))
+    .map((m) => ({ label: m.label, until: resting.get(m.label) as Date }))
+    .sort((a, b) => a.until.getTime() - b.until.getTime())[0];
+  return { ready: all.filter((m) => !resting.has(m.label)), soonest: soonest ?? null };
+}
+
+/** The keys free now; when none is but one will be within a minute or so, after waiting for it. */
+async function freeKeys(what: string, log: ResearchLog): Promise<Model[]> {
+  let state = await keyState();
+  if (state.ready.length > 0 || !state.soonest) return state.ready;
+  const wait = state.soonest.until.getTime() - Date.now();
+  if (wait > WAIT_MAX_MS) {
+    await log(`Every Groq key is over its limit; the first is free again at ${state.soonest.until.toISOString().slice(11, 16)} UTC, so ${what} had to wait. Use Fill in missing AI parts after that.`, "warn");
+    return [];
+  }
+  await log(`Every Groq key is at its per-minute limit; waiting ${Math.ceil(wait / 1000)}s for ${state.soonest.label}…`);
+  await new Promise((r) => setTimeout(r, Math.max(0, wait) + 500));
+  state = await keyState();
+  return state.ready;
+}
 
 /** A model's answer with what it cost, for the usage record. */
 type Answer = { text: string; usage: { inputTokens?: number; outputTokens?: number; totalTokens?: number }; headers?: Record<string, string> };
@@ -65,6 +94,8 @@ function groqModel({ label, key }: { label: string; key: string }): Model {
           await generateText({
             model: groq("openai/gpt-oss-120b"),
             tools: { browser_search: groq.tools.browserSearch({}) },
+            // A refused key hands over to the next at once: retrying the same key only meets its limit again.
+            maxRetries: 0,
             providerOptions: { groq: { reasoningEffort: effort, reasoningFormat: "hidden" } },
             abortSignal: AbortSignal.timeout(TIMEOUT_MS),
             prompt,
@@ -86,6 +117,7 @@ function groqModel({ label, key }: { label: string; key: string }): Model {
         await generateText({
           model: groq("openai/gpt-oss-120b"),
           providerOptions: { groq: { reasoningEffort: "low", reasoningFormat: "hidden" } },
+          maxRetries: 0,
           abortSignal: AbortSignal.timeout(TIMEOUT_MS),
           prompt,
         }),
@@ -93,36 +125,6 @@ function groqModel({ label, key }: { label: string; key: string }): Model {
     },
   };
 }
-
-const gemini: Model = {
-  label: "Gemini",
-  model: "gemini-2.5-flash",
-  search: async (prompt) => {
-    const { generateText } = await import("ai");
-    const { google } = await import("@ai-sdk/google");
-    return answer(
-      await generateText({
-        model: google("gemini-2.5-flash"),
-        tools: { google_search: google.tools.googleSearch({}) },
-        abortSignal: AbortSignal.timeout(TIMEOUT_MS),
-        prompt,
-      }),
-    );
-  },
-  write: async (prompt) => {
-    const { generateText } = await import("ai");
-    const { google } = await import("@ai-sdk/google");
-    return answer(await generateText({ model: google("gemini-2.5-flash"), abortSignal: AbortSignal.timeout(TIMEOUT_MS), prompt }));
-  },
-};
-
-/**
- * The models with a key and not resting, in order (contractor-sites' chain): each Groq key, then
- * Gemini when every Groq key errors or is over its limit. Search-grounded calls cannot also enforce a
- * JSON schema, so callers ask for JSON in the prompt and validate it.
- */
-const models = (): Model[] =>
-  [...groqKeys().map(groqModel), ...(process.env.GOOGLE_GENERATIVE_AI_API_KEY ? [gemini] : [])].filter((m) => !resting(m.label));
 
 /**
  * Runs one attempt and records it in `ai_calls` (tokens spent, the provider's rate-limit headers, and
@@ -155,40 +157,49 @@ async function attempt(m: Model, kind: "search" | "write", purpose: string, run:
 }
 
 /**
- * Asks each searching model in turn until one answers with text `accept` takes. Never throws: no
- * key or every model failing is `null`, and the caller sends the brand to review.
+ * Asks each free Groq key in turn until one answers with text `accept` takes. A key over its limit
+ * hands over to the next at once; when they all were, it waits for the first to be free (if that's
+ * soon) and goes round once more. Never throws: no key or every key failing is `null`, and the caller
+ * sends the brand to review.
  */
 export async function askWithSearch(
   prompt: string,
   { what, effort, log = noLog, accept = () => true }: { what: string; effort: Effort; log?: ResearchLog; accept?: (text: string) => boolean },
 ): Promise<string | null> {
-  const available = models();
-  // Every key over its limit (each rests 30 minutes): said, so an empty result is never a mystery.
-  if (available.length === 0) await log(`Every AI key is over its limit right now, so ${what} weren't searched.`, "warn");
-  for (const m of available) {
-    try {
-      await log(`Searching the web for ${what} with ${m.label}. This can take a minute…`);
-      const text = await attempt(m, "search", what, () => m.search(prompt, effort), accept);
-      if (accept(text)) return text;
-      await log(`${m.label} found nothing usable.`, "warn");
-    } catch (error) {
-      console.error(`[ai] ${m.label} search failed: ${message(error).slice(0, 200)}`);
-      if (isQuota(error)) rest(m.label);
-      await log(isQuota(error) ? `${m.label} is over its limit; it is skipped for the next 30 minutes.` : `${m.label} search failed.`, "warn");
+  if (!aiAvailable()) return null;
+  for (let round = 0; round < 2; round++) {
+    let limited = false;
+    for (const m of await freeKeys(what, log)) {
+      try {
+        await log(`Searching the web for ${what} with ${m.label}. This can take a minute…`);
+        const text = await attempt(m, "search", what, () => m.search(prompt, effort), accept);
+        if (accept(text)) return text;
+        await log(`${m.label} found nothing usable.`, "warn");
+      } catch (error) {
+        console.error(`[ai] ${m.label} search failed: ${message(error).slice(0, 200)}`);
+        if (isQuota(error)) limited = true;
+        await log(isQuota(error) ? `${m.label} is over its limit; trying the next key.` : `${m.label} search failed.`, "warn");
+      }
     }
+    if (!limited) break;
   }
   return null;
 }
 
-/** A plain (no search) answer for writing and extraction, from the same chain. Never throws. */
+/** A plain (no search) answer for writing and extraction, from the same keys. Never throws. */
 export async function askPlain(prompt: string, what = "writing"): Promise<string | null> {
-  for (const m of models()) {
-    try {
-      return await attempt(m, "write", what, () => m.write(prompt));
-    } catch (error) {
-      if (isQuota(error)) rest(m.label);
-      console.error(`[ai] ${m.label} writing failed: ${message(error).slice(0, 200)}`);
+  if (!aiAvailable()) return null;
+  for (let round = 0; round < 2; round++) {
+    let limited = false;
+    for (const m of await freeKeys(what, noLog)) {
+      try {
+        return await attempt(m, "write", what, () => m.write(prompt));
+      } catch (error) {
+        if (isQuota(error)) limited = true;
+        console.error(`[ai] ${m.label} writing failed: ${message(error).slice(0, 200)}`);
+      }
     }
+    if (!limited) break;
   }
   return null;
 }

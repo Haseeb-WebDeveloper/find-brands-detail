@@ -9,7 +9,7 @@ import type { ResearchLog } from "@/lib/research/log-types";
 
 const SOURCE_LABEL: Record<CheckedSite["source"], string> = {
   hint: "Website given in the batch",
-  search: "Found by Google search (Gemini)",
+  search: "Found by web search",
   "regional-link": "Linked from the brand's own site",
 };
 

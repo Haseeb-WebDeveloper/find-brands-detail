@@ -49,3 +49,14 @@ export async function recordAiCall(call: AiCallRecord): Promise<void> {
     console.error("[ai-usage] could not save a call", error);
   }
 }
+
+/**
+ * The calls each key made since `since`, for working out which keys are resting (rules.ts
+ * `restingKeys`). Called only by the AI chain inside the research jobs, so it takes no scope.
+ */
+export async function recentKeyCalls(since: Date) {
+  return prisma.aiCall.findMany({
+    where: { createdAt: { gte: since }, outcome: { in: ["limit", "answered", "unusable"] } },
+    select: { provider: true, outcome: true, createdAt: true, error: true, rateHeaders: true },
+  });
+}

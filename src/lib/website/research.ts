@@ -116,7 +116,7 @@ export async function researchWebsite(brand: string, hint: string | null, deps: 
   } else {
     await log("No website was given, so searching for it.");
   }
-  // No usable hint: ask Gemini. A hint that is proven or in review is trusted on its own.
+  // No usable hint: ask the AI to search. A hint that is proven or in review is trusted on its own.
   if (!candidates.some((c) => c.verdict.score !== "rejected")) {
     const found = (await deps.findOfficialSites(brand, log)).slice(0, MAX_CANDIDATES);
     if (found.length > 0) await log(`Search suggested ${found.map((s) => hostOf(s.url)).join(", ")}.`);

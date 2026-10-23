@@ -1,7 +1,7 @@
 /**
  * Website, Instagram and TikTok accuracy on the audited brands:
  *   pnpm test-set             (with the sheet's hints)
- *   pnpm test-set --no-hints  (Gemini discovery only)
+ *   pnpm test-set --no-hints  (AI discovery only)
  * Makes real requests. Website: an official site was chosen (or, for a brand with none, nothing
  * was), and the preferred one was. Instagram: the expected account was chosen. TikTok: likewise, on the
  * brands with an audited account. A chosen trap site or trap account is a hard failure (exit 1).
