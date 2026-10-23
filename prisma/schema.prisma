@@ -243,3 +243,36 @@ model ResearchLog {
   @@index([batchId, createdAt])
   @@map("research_logs")
 }
+
+/// One attempt at an AI model, kept so the team knows real usage per brand and per key, and when a
+/// key hit its free limit. Brand and batch are copied, not linked: deleting a batch keeps its usage.
+model AiCall {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  brandId       String?  @map("brand_id") @db.Uuid
+  brandName     String?  @map("brand_name")
+  batchId       String?  @map("batch_id") @db.Uuid
+  /// The key's label as the app names it: "Groq", "Groq 2" … "Gemini".
+  provider      String
+  model         String
+  /// "search" (with web search) or "write" (plain).
+  kind          String
+  /// What it was asked for ("numbuzin's campaigns").
+  purpose       String
+  /// "answered", "unusable" (answered, nothing usable), "limit" (over its quota) or "failed".
+  outcome       String
+  inputTokens   Int?     @map("input_tokens")
+  outputTokens  Int?     @map("output_tokens")
+  totalTokens   Int?     @map("total_tokens")
+  durationMs    Int      @map("duration_ms")
+  /// Groq's x-ratelimit-remaining-requests / -limit-requests (per day) at the time of the call.
+  requestsLeft  Int?     @map("requests_left")
+  requestsLimit Int?     @map("requests_limit")
+  /// Every x-ratelimit-* and retry-after header the provider sent, as sent.
+  rateHeaders   Json?    @map("rate_headers")
+  error         String?
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([createdAt])
+  @@index([brandId])
+  @@map("ai_calls")
+}

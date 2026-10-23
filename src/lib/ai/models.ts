@@ -1,5 +1,8 @@
 import "server-only";
 import { noLog, type ResearchLog } from "@/lib/research/log-types";
+import { currentAiBrand } from "@/lib/usage/context";
+import { errorHeaders, isQuotaError, rateLimitFrom, type AiOutcome } from "@/lib/usage/rules";
+import { recordAiCall } from "@/lib/usage/store";
 
 type Effort = "low" | "medium";
 
@@ -20,7 +23,7 @@ export function aiAvailable(): boolean {
 }
 const TIMEOUT_MS = 120_000;
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
-const isQuota = (error: unknown) => /quota|rate.?limit|429/i.test(message(error));
+const isQuota = (error: unknown) => isQuotaError(message(error));
 
 /**
  * A model over its quota is skipped for a while instead of being asked again for every brand: each
@@ -31,7 +34,15 @@ const restingUntil = new Map<string, number>();
 const resting = (label: string) => (restingUntil.get(label) ?? 0) > Date.now();
 const rest = (label: string) => restingUntil.set(label, Date.now() + COOLDOWN_MS);
 
-type Model = { label: string; search: (prompt: string, effort: Effort) => Promise<string>; write: (prompt: string) => Promise<string> };
+/** A model's answer with what it cost, for the usage record. */
+type Answer = { text: string; usage: { inputTokens?: number; outputTokens?: number; totalTokens?: number }; headers?: Record<string, string> };
+const answer = (r: { text: string; totalUsage: Answer["usage"]; response: { headers?: Record<string, string> } }): Answer => ({
+  text: r.text,
+  usage: r.totalUsage,
+  headers: r.response.headers,
+});
+
+type Model = { label: string; model: string; search: (prompt: string, effort: Effort) => Promise<Answer>; write: (prompt: string) => Promise<Answer> };
 
 function groqModel({ label, key }: { label: string; key: string }): Model {
   const provider = async () => {
@@ -40,19 +51,20 @@ function groqModel({ label, key }: { label: string; key: string }): Model {
   };
   return {
     label,
+    model: "openai/gpt-oss-120b",
     search: async (prompt, effort) => {
       const { generateText } = await import("ai");
       const groq = await provider();
       const ask = async () =>
-        (
+        answer(
           await generateText({
             model: groq("openai/gpt-oss-120b"),
             tools: { browser_search: groq.tools.browserSearch({}) },
             providerOptions: { groq: { reasoningEffort: effort, reasoningFormat: "hidden" } },
             abortSignal: AbortSignal.timeout(TIMEOUT_MS),
             prompt,
-          })
-        ).text;
+          }),
+        );
       try {
         return await ask();
       } catch (error) {
@@ -65,35 +77,37 @@ function groqModel({ label, key }: { label: string; key: string }): Model {
     write: async (prompt) => {
       const { generateText } = await import("ai");
       const groq = await provider();
-      return (
+      return answer(
         await generateText({
           model: groq("openai/gpt-oss-120b"),
           providerOptions: { groq: { reasoningEffort: "low", reasoningFormat: "hidden" } },
           abortSignal: AbortSignal.timeout(TIMEOUT_MS),
           prompt,
-        })
-      ).text;
+        }),
+      );
     },
   };
 }
 
 const gemini: Model = {
   label: "Gemini",
+  model: "gemini-2.5-flash",
   search: async (prompt) => {
     const { generateText } = await import("ai");
     const { google } = await import("@ai-sdk/google");
-    const { text } = await generateText({
-      model: google("gemini-2.5-flash"),
-      tools: { google_search: google.tools.googleSearch({}) },
-      abortSignal: AbortSignal.timeout(TIMEOUT_MS),
-      prompt,
-    });
-    return text;
+    return answer(
+      await generateText({
+        model: google("gemini-2.5-flash"),
+        tools: { google_search: google.tools.googleSearch({}) },
+        abortSignal: AbortSignal.timeout(TIMEOUT_MS),
+        prompt,
+      }),
+    );
   },
   write: async (prompt) => {
     const { generateText } = await import("ai");
     const { google } = await import("@ai-sdk/google");
-    return (await generateText({ model: google("gemini-2.5-flash"), abortSignal: AbortSignal.timeout(TIMEOUT_MS), prompt })).text;
+    return answer(await generateText({ model: google("gemini-2.5-flash"), abortSignal: AbortSignal.timeout(TIMEOUT_MS), prompt }));
   },
 };
 
@@ -106,6 +120,36 @@ const models = (): Model[] =>
   [...groqKeys().map(groqModel), ...(process.env.GOOGLE_GENERATIVE_AI_API_KEY ? [gemini] : [])].filter((m) => !resting(m.label));
 
 /**
+ * Runs one attempt and records it in `ai_calls` (tokens spent, the provider's rate-limit headers, and
+ * whether it was refused for being over its limit) against the brand the job is researching.
+ * `usable` decides "answered" versus "unusable" for an answer that came back.
+ */
+async function attempt(m: Model, kind: "search" | "write", purpose: string, run: () => Promise<Answer>, usable: (text: string) => boolean = () => true) {
+  const started = Date.now();
+  const record = (outcome: AiOutcome, a: Answer | null, error: unknown) =>
+    recordAiCall({
+      brandId: currentAiBrand(),
+      provider: m.label,
+      model: m.model,
+      kind,
+      purpose,
+      outcome,
+      tokens: { input: a?.usage.inputTokens ?? null, output: a?.usage.outputTokens ?? null, total: a?.usage.totalTokens ?? null },
+      durationMs: Date.now() - started,
+      rateLimit: rateLimitFrom(a ? a.headers : errorHeaders(error)),
+      error: error === null ? null : message(error),
+    });
+  try {
+    const a = await run();
+    await record(usable(a.text) ? "answered" : "unusable", a, null);
+    return a.text;
+  } catch (error) {
+    await record(isQuota(error) ? "limit" : "failed", null, error);
+    throw error;
+  }
+}
+
+/**
  * Asks each searching model in turn until one answers with text `accept` takes. Never throws: no
  * key or every model failing is `null`, and the caller sends the brand to review.
  */
@@ -116,7 +160,7 @@ export async function askWithSearch(
   for (const m of models()) {
     try {
       await log(`Searching the web for ${what} with ${m.label}. This can take a minute…`);
-      const text = await m.search(prompt, effort);
+      const text = await attempt(m, "search", what, () => m.search(prompt, effort), accept);
       if (accept(text)) return text;
       await log(`${m.label} found nothing usable.`, "warn");
     } catch (error) {
@@ -129,10 +173,10 @@ export async function askWithSearch(
 }
 
 /** A plain (no search) answer for writing and extraction, from the same chain. Never throws. */
-export async function askPlain(prompt: string): Promise<string | null> {
+export async function askPlain(prompt: string, what = "writing"): Promise<string | null> {
   for (const m of models()) {
     try {
-      return await m.write(prompt);
+      return await attempt(m, "write", what, () => m.write(prompt));
     } catch (error) {
       if (isQuota(error)) rest(m.label);
       console.error(`[ai] ${m.label} writing failed: ${message(error).slice(0, 200)}`);

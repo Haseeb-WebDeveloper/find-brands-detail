@@ -52,7 +52,7 @@ export async function runCampaignsStep(brandId: string, log: ResearchLog): Promi
         const ask = () => askWithSearch(prompt, { what: `${name}'s campaigns`, effort: "low", log: l, accept: (t) => parseCampaignsAnswer(t).length > 0 });
         return (await ask()) ?? ask();
       },
-      write: askPlain,
+      write: (prompt) => askPlain(prompt, `${name}'s campaign descriptions`),
       fetchPage,
       checkImage: (url) => checkImageUrl(url, "campaign"),
       loadPosts: async (since) => {

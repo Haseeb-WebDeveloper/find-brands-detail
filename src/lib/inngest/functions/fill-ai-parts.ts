@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { runCampaignsStep } from "@/lib/research/campaigns-step";
 import { runDetailsStep } from "@/lib/research/details-step";
 import { runScoreStep } from "@/lib/research/score-step";
+import { withAiBrand } from "@/lib/usage/context";
 
 /**
  * Fills in only what the AI makes and a brand is missing, for brands researched while no model could
@@ -33,19 +34,24 @@ export const fillAiParts = inngest.createFunction(
     await step.run("start", async () => {
       await (await researchLogger(brandId, null))("Filling in the missing AI parts.");
     });
-    await step.run("campaigns", async () => {
-      if ((await prisma.campaign.count({ where: { brandId } })) > 0) return;
-      await markStep(brandId, "campaigns");
-      const log = await researchLogger(brandId, "campaigns");
-      await log("Researching campaigns…");
-      await runCampaignsStep(brandId, log);
-    });
-    await step.run("details", async () => {
-      await markStep(brandId, "details");
-      const log = await researchLogger(brandId, "details");
-      await log("Drafting brand details…");
-      await runDetailsStep(brandId, log);
-    });
+    // The brand marks the AI calls these steps make, so their usage is recorded against it.
+    await step.run("campaigns", () =>
+      withAiBrand(brandId, async () => {
+        if ((await prisma.campaign.count({ where: { brandId } })) > 0) return;
+        await markStep(brandId, "campaigns");
+        const log = await researchLogger(brandId, "campaigns");
+        await log("Researching campaigns…");
+        await runCampaignsStep(brandId, log);
+      }),
+    );
+    await step.run("details", () =>
+      withAiBrand(brandId, async () => {
+        await markStep(brandId, "details");
+        const log = await researchLogger(brandId, "details");
+        await log("Drafting brand details…");
+        await runDetailsStep(brandId, log);
+      }),
+    );
     await step.run("score", async () => {
       await markStep(brandId, "score");
       await runScoreStep(brandId, await researchLogger(brandId, "score"));

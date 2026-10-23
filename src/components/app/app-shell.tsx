@@ -35,6 +35,9 @@ function Account({ nav }: { nav: Promise<ShellNav | null> }) {
   if (!data) return <span className="size-(--ds-control-lg)" />;
   return (
     <div className="flex items-center gap-1">
+      <Button kind="plain" size="sm" href="/usage" className="text-label">
+        Usage
+      </Button>
       {data.canSeeTeam ? (
         <Button kind="plain" size="sm" href="/team" className="text-label">
           Team

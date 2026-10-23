@@ -10,6 +10,7 @@ import { runImagesStep } from "@/lib/research/images-step";
 import { runScoreStep } from "@/lib/research/score-step";
 import { runCampaignsStep } from "@/lib/research/campaigns-step";
 import { runDetailsStep } from "@/lib/research/details-step";
+import { withAiBrand } from "@/lib/usage/context";
 
 /** The steps with real work so far; the rest are announced and skipped until their build lands. */
 const RUNNERS: Partial<Record<ResearchStepId, typeof runWebsiteStep>> = {
@@ -52,17 +53,20 @@ export const researchBrand = inngest.createFunction(
       await (await researchLogger(brandId, null))("Research started.");
     });
     for (const { id, label } of RESEARCH_STEPS) {
-      await step.run(`step:${id}`, async () => {
-        await markStep(brandId, id);
-        const log = await researchLogger(brandId, id);
-        const run = RUNNERS[id];
-        if (run) {
-          await log(`${label}…`);
-          await run(brandId, log);
-        } else {
-          await log(NOT_YET[id] ?? `${label}: skipped.`);
-        }
-      });
+      // The brand marks the AI calls this step makes, so their usage is recorded against it.
+      await step.run(`step:${id}`, () =>
+        withAiBrand(brandId, async () => {
+          await markStep(brandId, id);
+          const log = await researchLogger(brandId, id);
+          const run = RUNNERS[id];
+          if (run) {
+            await log(`${label}…`);
+            await run(brandId, log);
+          } else {
+            await log(NOT_YET[id] ?? `${label}: skipped.`);
+          }
+        }),
+      );
     }
     await step.run("finish", async () => {
       await finishResearch(brandId);
