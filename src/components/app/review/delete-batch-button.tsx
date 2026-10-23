@@ -19,7 +19,7 @@ export function DeleteBatchButton({ batchId, batchName, brandCount }: { batchId:
       const result = await deleteBatch(batchId);
       if (!result.ok) {
         setOpen(false);
-        return toast(result.error);
+        return toast(result.error, { tone: "error" });
       }
       toast(`Deleted ${batchName}.`);
       router.push("/");

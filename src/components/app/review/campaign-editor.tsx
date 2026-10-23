@@ -30,7 +30,7 @@ function useRun() {
   const run = (action: () => Promise<{ ok: true } | { ok: false; error: string }>, done?: string, after?: () => void) =>
     start(async () => {
       const r = await action();
-      if (!r.ok) return toast(r.error);
+      if (!r.ok) return toast(r.error, { tone: "error" });
       if (done) toast(done);
       after?.();
       router.refresh();

@@ -28,8 +28,8 @@ export function RetryButton({ brandId }: { brandId: string }) {
         onConfirm={() =>
           start(async () => {
             const result = await retryResearch(brandId);
-            if (!result.ok) return toast(result.error);
-            toast("Research started again.");
+            if (!result.ok) return toast(result.error, { tone: "error" });
+            toast("Research started again.", { tone: "info" });
             router.refresh();
           })
         }

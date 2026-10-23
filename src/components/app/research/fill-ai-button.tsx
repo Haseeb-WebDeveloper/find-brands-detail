@@ -22,8 +22,8 @@ export function FillAiButton({ target, label }: { target: { brandId: string } | 
       onClick={() =>
         start(async () => {
           const result = await fillMissingAi(target);
-          if (!result.ok) return toast(result.error);
-          toast(result.count === 1 ? "Filling in the missing parts." : `Filling in the missing parts of ${result.count} brands.`);
+          if (!result.ok) return toast(result.error, { tone: "error" });
+          toast(result.count === 1 ? "Filling in the missing parts." : `Filling in the missing parts of ${result.count} brands.`, { tone: "info" });
           router.refresh();
         })
       }

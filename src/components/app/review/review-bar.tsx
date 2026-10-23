@@ -47,7 +47,7 @@ export function ReviewBar({ brandId, batchId, siblings, status, canEdit }: { bra
           onClick={() =>
             start(async () => {
               const r = await markReviewed(brandId);
-              if (!r.ok) return toast(r.error);
+              if (!r.ok) return toast(r.error, { tone: "error" });
               if (!after) toast("That was the last one. The batch is reviewed.");
               go(after);
             })

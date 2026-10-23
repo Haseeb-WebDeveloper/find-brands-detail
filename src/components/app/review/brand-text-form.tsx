@@ -48,7 +48,7 @@ export function BrandTextForm({ brandId, initial, canEdit }: { brandId: string; 
     if ((Object.keys(next) as Key[]).every((k) => next[k].trim() === saved[k].trim())) return;
     start(async () => {
       const r = await saveBrandText(brandId, next);
-      if (!r.ok) return toast(r.error);
+      if (!r.ok) return toast(r.error, { tone: "error" });
       setSaved(next);
       router.refresh();
     });

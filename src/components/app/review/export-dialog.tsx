@@ -68,7 +68,7 @@ export function ExportButton({ brands, batchName }: { brands: Brand[]; batchName
         onConfirm={() =>
           start(async () => {
             const r = await exportBrands([...selected]);
-            if (!r.ok) return toast(r.error);
+            if (!r.ok) return toast(r.error, { tone: "error" });
             download(r.csv, exportFileName(batchName, new Date()));
             toast(`Downloaded ${r.count} brand${r.count === 1 ? "" : "s"}.`);
             router.refresh();

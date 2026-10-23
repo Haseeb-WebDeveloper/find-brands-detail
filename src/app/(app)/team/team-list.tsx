@@ -23,7 +23,7 @@ function useAction() {
   const run = (fn: () => Promise<Result>, done: string) =>
     start(async () => {
       const result = await fn();
-      if (!result.ok) return toast(result.error);
+      if (!result.ok) return toast(result.error, { tone: "error" });
       toast(done);
       router.refresh();
     });

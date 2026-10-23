@@ -23,7 +23,7 @@ export function UseThisButton({ brandId, field, candidateId }: { brandId: string
       onClick={() =>
         start(async () => {
           const r = await chooseValue(brandId, field, candidateId);
-          if (!r.ok) return toast(r.error);
+          if (!r.ok) return toast(r.error, { tone: "error" });
           router.refresh();
         })
       }
@@ -50,8 +50,8 @@ export function TypeValue({ brandId, field }: { brandId: string; field: ReviewFi
   const submit = () =>
     start(async () => {
       const r = await typeValue(brandId, field, value);
-      if (!r.ok) return toast(r.error);
-      toast(`Checked: ${WORD[r.score]}. ${r.reason.replace(/^Typed by a reviewer\. /, "")}`);
+      if (!r.ok) return toast(r.error, { tone: "error" });
+      toast(`Checked: ${WORD[r.score]}. ${r.reason.replace(/^Typed by a reviewer\. /, "")}`, { tone: r.score === "proven" ? "success" : r.score === "rejected" ? "error" : "info" });
       setValue("");
       router.refresh();
     });
