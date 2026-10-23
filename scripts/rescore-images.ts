@@ -31,7 +31,7 @@ async function main() {
       slot,
       url,
       source: { kind: (["site", "instagram", "tiktok", "third_party"].includes(kind) ? kind : "site") as Candidate["source"]["kind"], label },
-      check: { url, slot, ok, status, width, height, passesMin: ok, minDimension: slot === "logo" ? 256 : 800 },
+      check: { url, slot, ok, status, width: width ?? undefined, height: height ?? undefined, passesMin: ok, minDimension: slot === "logo" ? 256 : 800 },
       expiresAt: expiresAt ? new Date(expiresAt) : null,
     };
   };
