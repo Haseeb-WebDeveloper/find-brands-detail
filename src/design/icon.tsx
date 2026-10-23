@@ -75,6 +75,10 @@ import {
   RotateCcw,
   Send,
   Square,
+  Crop,
+  ImageIcon,
+  ZoomIn,
+  ZoomOut,
 } from "lucide-react";
 import { cn } from "./cn";
 
@@ -174,6 +178,10 @@ const ICONS = {
   today: CalendarCheck,
   undo: Undo2,
   warning: TriangleAlert,
+  crop: Crop,
+  image: ImageIcon,
+  zoomIn: ZoomIn,
+  zoomOut: ZoomOut,
 } satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof ICONS;

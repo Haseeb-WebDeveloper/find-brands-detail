@@ -1,4 +1,5 @@
-// Copied from db-admin src/lib/schemas/brand-import.ts (2026-10-21). Keep in step with the importer.
+// Copied from db-admin src/lib/schemas/brand-import.ts (2026-10-21), with its image framing columns
+// (2026-10-23, db-admin feat/import-image-framing). Keep in step with the importer.
 /**
  * CSV bulk-import row schema.
  *
@@ -19,6 +20,7 @@ import {
 } from "./brand-create";
 import { activationReasons } from "./activation";
 import type { ImageSlot } from "@/lib/images/min-dimensions";
+import { FRAMING_HINT, parseFraming, type Framing } from "@/lib/images/framing";
 
 /** db-admin `src/types/backend.ts`, the parts the importer builds. */
 interface ProfilePayload {
@@ -62,6 +64,7 @@ export const BRAND_COLUMNS = [
   "parent_brand_id",
   "logo_url",
   "cover_image_url",
+  "cover_image_framing",
   "profile_regions",
   "profile_countries",
   "profile_industries",
@@ -74,11 +77,13 @@ export function campaignColumns(slot: number): {
   title: string;
   description: string;
   imageUrl: string;
+  imageFraming: string;
 } {
   return {
     title: `campaign_${slot}_title`,
     description: `campaign_${slot}_description`,
     imageUrl: `campaign_${slot}_image_url`,
+    imageFraming: `campaign_${slot}_image_framing`,
   };
 }
 
@@ -87,7 +92,7 @@ export const IMPORT_HEADERS: string[] = [
   ...BRAND_COLUMNS,
   ...Array.from({ length: MAX_CAMPAIGN_SLOTS }, (_, i) => {
     const c = campaignColumns(i + 1);
-    return [c.title, c.description, c.imageUrl];
+    return [c.title, c.description, c.imageUrl, c.imageFraming];
   }).flat(),
 ];
 
@@ -127,6 +132,8 @@ export interface ImageRef {
   slot: ImageSlot;
   /** Index into `payload.campaigns` — campaign slots only. */
   campaignIndex?: number;
+  /** Where the image sits in its frame (lib/images/framing.ts); absent: the centre crop. */
+  framing?: Framing;
 }
 
 export interface ParsedImportRow {
@@ -265,12 +272,14 @@ export function validateImportRow(raw: RawImportRow): ImportRowValidation {
   }
 
   const coverUrl = cell(raw, "cover_image_url");
+  const coverFraming = parseFraming(cell(raw, "cover_image_framing"));
+  if (coverFraming === "invalid") errors.push({ column: "cover_image_framing", message: `Must be ${FRAMING_HINT}` });
   if (!coverUrl) {
     errors.push({ column: "cover_image_url", message: "Cover image URL is required" });
   } else if (!isHttpUrl(coverUrl)) {
     errors.push({ column: "cover_image_url", message: "Must be an http(s) URL" });
   } else {
-    images.push({ column: "cover_image_url", url: coverUrl, slot: "cover" });
+    images.push({ column: "cover_image_url", url: coverUrl, slot: "cover", ...(coverFraming && coverFraming !== "invalid" ? { framing: coverFraming } : {}) });
   }
 
   // ── Campaigns ─────────────────────────────────────────────────────────────
@@ -282,6 +291,7 @@ export function validateImportRow(raw: RawImportRow): ImportRowValidation {
     const title = cell(raw, cols.title);
     const desc = cell(raw, cols.description);
     const imageUrl = cell(raw, cols.imageUrl);
+    const framing = parseFraming(cell(raw, cols.imageFraming));
 
     // An entirely empty slot is a trailing gap, not an error.
     if (!title && !desc && !imageUrl) continue;
@@ -306,6 +316,11 @@ export function validateImportRow(raw: RawImportRow): ImportRowValidation {
       continue;
     }
 
+    if (framing === "invalid") {
+      errors.push({ column: cols.imageFraming, message: `Must be ${FRAMING_HINT}` });
+      malformedCampaigns++;
+      continue;
+    }
     if (!imageUrl) {
       errors.push({ column: cols.imageUrl, message: "Campaign image URL is required" });
       malformedCampaigns++;
@@ -322,6 +337,7 @@ export function validateImportRow(raw: RawImportRow): ImportRowValidation {
       url: imageUrl,
       slot: "campaign",
       campaignIndex: campaigns.length,
+      ...(framing ? { framing } : {}),
     });
     campaigns.push({ title: parsed.data.title, description: parsed.data.description });
   }

@@ -6,6 +6,8 @@ import type { PageFacts } from "@/lib/website/extract";
 import type { LogLine } from "@/lib/batches/scoped";
 import type { LogLevel } from "@/lib/research/log-types";
 import { missingAiParts, stuckBrandIds, type MissingAi } from "@/lib/research/ai-fill";
+import type { Framing } from "@/lib/images/framing";
+import { storedFraming } from "@/lib/review/framing-input";
 
 export type CampaignCard = {
   id: string;
@@ -17,12 +19,12 @@ export type CampaignCard = {
   note: string | null;
   sources: string[];
   status: CampaignStatus;
-  images: { id: string; url: string; sourceKind: ImageSourceKind; width: number | null; height: number | null; score: CandidateScore; reason: string; selected: boolean }[];
+  images: { id: string; url: string; sourceKind: ImageSourceKind; width: number | null; height: number | null; score: CandidateScore; reason: string; selected: boolean; framing: Framing | null }[];
 };
 
 type FieldSection = {
   selectedCandidateId: string | null;
-  candidates: { id: string; value: string; source: string; score: CandidateScore; reason: string; evidence: Record<string, unknown> }[];
+  candidates: { id: string; value: string; source: string; score: CandidateScore; reason: string; evidence: Record<string, unknown>; framing: Framing | null }[];
 };
 
 export type BrandDetail = {
@@ -81,6 +83,7 @@ export async function getBrandDetail(_scope: TeamScope, id: string): Promise<Bra
         score: c.score,
         reason: c.reason,
         evidence: (c.evidence ?? {}) as Record<string, unknown>,
+        framing: storedFraming(c.framing),
       })),
   });
   return {
@@ -108,7 +111,7 @@ export async function getBrandDetail(_scope: TeamScope, id: string): Promise<Bra
         note: src.note ?? null,
         sources: src.urls ?? [],
         status: c.status,
-        images: c.images.map((i) => ({ id: i.id, url: i.url, sourceKind: i.sourceKind, width: i.width, height: i.height, score: i.score, reason: i.reason, selected: i.selected })),
+        images: c.images.map((i) => ({ id: i.id, url: i.url, sourceKind: i.sourceKind, width: i.width, height: i.height, score: i.score, reason: i.reason, selected: i.selected, framing: storedFraming(i.framing) })),
       };
     }),
     text: {

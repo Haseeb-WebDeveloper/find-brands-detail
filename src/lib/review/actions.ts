@@ -6,6 +6,7 @@ import { REVIEW_FIELDS, toList, type ReviewField } from "@/lib/export/row";
 import { TIER_OPTIONS } from "@/lib/export/importer/brand-create";
 import { checkTyped, type TypedDeps } from "@/lib/review/check-typed";
 import { validateCampaignInput } from "@/lib/review/campaign-input";
+import { cleanFraming } from "@/lib/review/framing-input";
 import { getReviewState } from "@/lib/review/scoped";
 import {
   addCampaign as storeAddCampaign,
@@ -13,6 +14,8 @@ import {
   addTypedCandidate,
   brandForImages,
   campaignBrand,
+  frameCampaignImage as storeFrameCampaignImage,
+  frameCandidate as storeFrameCandidate,
   chooseCandidate,
   reorderCampaigns as storeReorderCampaigns,
   saveBrandText as storeSaveBrandText,
@@ -37,6 +40,7 @@ type Checked = { ok: true; score: "proven" | "review" | "rejected"; reason: stri
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const DENIED = { ok: false, error: "You can't change brands." } as const;
 const MISSING = { ok: false, error: "That doesn't exist any more. Reload the page." } as const;
+const BAD_FRAMING = { ok: false, error: "That framing can't be used. Press Fill frame and place it again." } as const;
 
 function refresh(written: NonNullable<Written>) {
   revalidatePath(`/brands/${written.brandId}`);
@@ -64,11 +68,13 @@ async function checkCampaignImage(brand: { name: string; domains: string[]; inst
 // ─── Fields ─────────────────────────────────────────────────────────────────
 
 /** The reviewer picks another of the candidates research found. */
-export async function chooseValue(brandId: string, field: ReviewField, candidateId: string): Promise<Result> {
+export async function chooseValue(brandId: string, field: ReviewField, candidateId: string, framing?: unknown): Promise<Result> {
   const scope = await getTeamScope();
   if (!scope || !scopeCan(scope, "batches:write")) return DENIED;
   if (!UUID.test(brandId) || !UUID.test(candidateId) || !REVIEW_FIELDS.includes(field)) return MISSING;
-  const written = await chooseCandidate(scope, brandId, field, candidateId);
+  const f = framing === undefined ? undefined : cleanFraming(framing);
+  if (f && !f.ok) return BAD_FRAMING;
+  const written = await chooseCandidate(scope, brandId, field, candidateId, f?.framing);
   if (!written) return MISSING;
   refresh(written);
   return { ok: true };
@@ -168,11 +174,14 @@ export async function reorderCampaigns(brandId: string, order: string[]): Promis
   return { ok: true };
 }
 
-export async function selectCampaignImage(campaignId: string, imageId: string): Promise<Result> {
+/** Makes an image the campaign's one; with `framing`, where it sits in the tile too ("Use this image" in the viewer). */
+export async function selectCampaignImage(campaignId: string, imageId: string, framing?: unknown): Promise<Result> {
   const scope = await getTeamScope();
   if (!scope || !scopeCan(scope, "batches:write")) return DENIED;
   if (!UUID.test(campaignId) || !UUID.test(imageId)) return MISSING;
-  const written = await storeSelectCampaignImage(scope, campaignId, imageId);
+  const f = framing === undefined ? undefined : cleanFraming(framing);
+  if (f && !f.ok) return BAD_FRAMING;
+  const written = await storeSelectCampaignImage(scope, campaignId, imageId, f?.framing);
   if (!written) return MISSING;
   refresh(written);
   return { ok: true };
@@ -208,6 +217,34 @@ export async function addCampaign(brandId: string, data: { title: string; descri
     image = checked;
   }
   const written = await storeAddCampaign(scope, brandId, { title: data.title, description: data.description, image });
+  if (!written) return MISSING;
+  refresh(written);
+  return { ok: true };
+}
+
+// ─── Framing ────────────────────────────────────────────────────────────────
+
+/** Where a campaign image sits in its tile ("Save framing" in the viewer); null is the centre crop. */
+export async function frameCampaignImage(imageId: string, framing: unknown): Promise<Result> {
+  const scope = await getTeamScope();
+  if (!scope || !scopeCan(scope, "batches:write")) return DENIED;
+  if (!UUID.test(imageId)) return MISSING;
+  const f = cleanFraming(framing);
+  if (!f.ok) return BAD_FRAMING;
+  const written = await storeFrameCampaignImage(scope, imageId, f.framing);
+  if (!written) return MISSING;
+  refresh(written);
+  return { ok: true };
+}
+
+/** Where a cover sits in its card ("Save framing" in the viewer); null is the centre crop. */
+export async function frameCover(candidateId: string, framing: unknown): Promise<Result> {
+  const scope = await getTeamScope();
+  if (!scope || !scopeCan(scope, "batches:write")) return DENIED;
+  if (!UUID.test(candidateId)) return MISSING;
+  const f = cleanFraming(framing);
+  if (!f.ok) return BAD_FRAMING;
+  const written = await storeFrameCandidate(scope, candidateId, f.framing);
   if (!written) return MISSING;
   refresh(written);
   return { ok: true };

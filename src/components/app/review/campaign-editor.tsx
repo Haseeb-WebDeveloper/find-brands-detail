@@ -10,11 +10,14 @@ import { TextField } from "@/design/text-field";
 import { useToast } from "@/design/toast";
 import { cn } from "@/design/cn";
 import type { CampaignCard } from "@/lib/brands/scoped";
-import { ImageViewer } from "@/components/app/review/image-viewer";
+import { ImageViewer, type ViewerAction, type ViewerFrame, type ViewerImage } from "@/components/app/review/image-viewer";
+import { FramedImage } from "@/components/app/review/framed-image";
+import { FRAME_ASPECT } from "@/lib/images/framing";
 import { FindMoreCampaignsButton } from "@/components/app/research/find-more-button";
 import {
   addCampaign,
   addCampaignImage,
+  frameCampaignImage,
   reorderCampaigns,
   saveCampaign,
   selectCampaignImage,
@@ -23,6 +26,24 @@ import {
 
 /** The DB importer's limit. */
 const MAX = 500;
+
+/** The site's campaign tile: what the DB importer crops a campaign image to. */
+const TILE: ViewerFrame = { kind: "box", aspect: FRAME_ASPECT.campaign, label: "Campaign tile, as on the site" };
+
+type Img = CampaignCard["images"][number];
+const viewerImage = (i: Img, caption: string): ViewerImage => ({ url: i.url, caption, framing: i.framing, size: i.width && i.height ? { w: i.width, h: i.height } : null });
+
+/** "Use this image" in its framing, and "Save framing" for the one used, for a campaign's images. */
+function imageAction(campaignId: string, images: Img[], pending: boolean, run: ReturnType<typeof useRun>[1]): ViewerAction {
+  return {
+    label: "Use this image",
+    doneLabel: "In use",
+    busy: pending,
+    done: (n) => Boolean(images[n]?.selected),
+    onUse: (n, framing) => run(() => selectCampaignImage(campaignId, images[n].id, framing), "Image chosen."),
+    onFrame: (n, framing) => run(() => frameCampaignImage(images[n].id, framing), "Framing saved."),
+  };
+}
 
 function useRun() {
   const router = useRouter();
@@ -118,8 +139,7 @@ function EditDialog({ c, open, onOpenChange }: { c: CampaignCard; open: boolean;
                       onClick={() => setViewing(n)}
                       className={cn("block cursor-zoom-in overflow-hidden rounded-md", isUsed && "ring-2 ring-tint")}
                     >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={i.url} alt="" loading="lazy" referrerPolicy="no-referrer" className="aspect-[200/236] w-full bg-fill object-cover" />
+                      <FramedImage src={i.url} aspect={FRAME_ASPECT.campaign} framing={i.framing} size={i.width && i.height ? { w: i.width, h: i.height } : null} className="aspect-[200/236] w-full" />
                     </button>
                     {isUsed ? (
                       <span className="rounded bg-tint py-0.5 text-center text-caption font-medium text-tint-contrast">Used</span>
@@ -139,16 +159,11 @@ function EditDialog({ c, open, onOpenChange }: { c: CampaignCard; open: boolean;
             </div>
             {viewing !== null ? (
               <ImageViewer
-                images={images.map((i) => ({ url: i.url, caption: c.title }))}
+                images={images.map((i) => viewerImage(i, c.title))}
                 start={viewing}
                 onClose={() => setViewing(null)}
-                action={{
-                  label: "Use this image",
-                  doneLabel: "Used",
-                  busy: pending,
-                  done: (n) => images[n]?.id === used?.id,
-                  onPress: (n) => run(() => selectCampaignImage(c.id, images[n].id), "Image chosen."),
-                }}
+                frame={TILE}
+                action={imageAction(c.id, images, pending, run)}
               />
             ) : null}
           </div>
@@ -203,8 +218,7 @@ function Tile({ c, canEdit }: { c: CampaignCard; canEdit: boolean }) {
       >
         {image ? (
           <button type="button" onClick={() => setViewing(true)} className="cursor-zoom-in" aria-label={`View ${c.title} full screen`}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={image.url} alt="" loading="lazy" referrerPolicy="no-referrer" draggable={false} className="aspect-[200/236] w-full rounded-lg bg-fill object-cover" />
+            <FramedImage src={image.url} aspect={FRAME_ASPECT.campaign} framing={image.framing} size={image.width && image.height ? { w: image.width, h: image.height } : null} className="aspect-[200/236] w-full rounded-lg" />
           </button>
         ) : (
           <button type="button" disabled={!canEdit} onClick={() => setEditing(true)} className="flex aspect-[200/236] w-full items-center justify-center rounded-lg bg-fill text-footnote text-label-tertiary">
@@ -230,7 +244,15 @@ function Tile({ c, canEdit }: { c: CampaignCard; canEdit: boolean }) {
           </button>
         ) : null}
       </div>
-      {viewing ? <ImageViewer images={gallery.map((i) => ({ url: i.url, caption: c.title }))} start={0} onClose={() => setViewing(false)} /> : null}
+      {viewing ? (
+        <ImageViewer
+          images={gallery.map((i) => viewerImage(i, c.title))}
+          start={0}
+          onClose={() => setViewing(false)}
+          frame={TILE}
+          action={canEdit ? imageAction(c.id, gallery, pending, run) : undefined}
+        />
+      ) : null}
       {canEdit ? <EditDialog c={c} open={editing} onOpenChange={setEditing} /> : null}
     </>
   );

@@ -24,11 +24,11 @@ function toRow(field: ReviewField, c: Candidate): RowCandidate {
   if (field === "instagram" || field === "tiktok") {
     const meta = [typeof e.followers === "number" ? `${compact.format(e.followers)} followers` : null, e.verified ? "verified" : null].filter(Boolean).join(" · ");
     const href = field === "instagram" ? `https://www.instagram.com/${c.value}/` : `https://www.tiktok.com/@${c.value}`;
-    return { ...base, label: `@${c.value}`, meta, href, image: null };
+    return { ...base, label: `@${c.value}`, meta, href, image: null, framing: null, size: null };
   }
-  if (field === "website") return { ...base, label: c.value.replace(/^https?:\/\//, "").replace(/\/$/, ""), meta: "", href: c.value, image: null };
+  if (field === "website") return { ...base, label: c.value.replace(/^https?:\/\//, "").replace(/\/$/, ""), meta: "", href: c.value, image: null, framing: null, size: null };
   const size = e.width && e.height ? `${e.width}×${e.height}` : (c.reason.match(/\d+×\d+/)?.[0] ?? "");
-  return { ...base, label: origin(c, e), meta: size, href: c.value, image: c.value };
+  return { ...base, label: origin(c, e), meta: size, href: c.value, image: c.value, framing: c.framing, size: e.width && e.height ? { w: e.width, h: e.height } : null };
 }
 
 /** The five facts, one row each: the chosen value at a glance, everything else behind "Change". */

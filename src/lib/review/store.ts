@@ -1,13 +1,16 @@
 import "server-only";
-import type { CampaignStatus, CandidateScore, Prisma } from "@prisma/client";
+import { Prisma, type CampaignStatus, type CandidateScore } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { TeamScope } from "@/lib/auth/scope";
 import type { ReviewField } from "@/lib/export/row";
 import type { TypedCheck } from "@/lib/review/check-typed";
+import type { Framing } from "@/lib/images/framing";
 import { REQUIRED_FIELDS, reviewSummary, type RequiredField } from "@/lib/research/review-summary";
 
 type Tx = Prisma.TransactionClient;
 const json = (value: unknown) => value as Prisma.InputJsonValue;
+/** A framing for a JSON column: the centre crop (null) is stored as SQL NULL. */
+const framingValue = (framing: Framing | null) => (framing ? json(framing) : Prisma.DbNull);
 
 /** Keeps the batch table's "needs you" count right after a reviewer's choice. */
 async function recount(tx: Tx, brandId: string) {
@@ -37,10 +40,12 @@ async function owner(tx: Tx, brandId: string): Promise<Written> {
 
 // ─── Fields ─────────────────────────────────────────────────────────────────
 
-export async function chooseCandidate(_scope: TeamScope, brandId: string, field: ReviewField, candidateId: string): Promise<Written> {
+/** Chooses one of a field's candidates; `framing` (a cover's place in its frame) is saved with it when given. */
+export async function chooseCandidate(_scope: TeamScope, brandId: string, field: ReviewField, candidateId: string, framing?: Framing | null): Promise<Written> {
   return prisma.$transaction(async (tx) => {
     const c = await tx.candidate.findFirst({ where: { id: candidateId, brandId, field }, select: { id: true } });
     if (!c) return null;
+    if (framing !== undefined && field === "cover") await tx.candidate.update({ where: { id: c.id }, data: { framing: framingValue(framing) } });
     await select(tx, brandId, field, c.id);
     return owner(tx, brandId);
   });
@@ -108,13 +113,14 @@ export async function setCampaignStatus(_scope: TeamScope, campaignId: string, s
 }
 
 /** The image used for the campaign (and exported); the others stay as suggestions to pick from. */
-export async function selectCampaignImage(_scope: TeamScope, campaignId: string, imageId: string): Promise<Written> {
+/** Makes an image the campaign's one; `framing` (its place in the tile) is saved with it when given. */
+export async function selectCampaignImage(_scope: TeamScope, campaignId: string, imageId: string, framing?: Framing | null): Promise<Written> {
   return prisma.$transaction(async (tx) => {
     const c = await campaignOwner(tx, campaignId);
     const image = await tx.campaignImage.findFirst({ where: { id: imageId, campaignId }, select: { id: true } });
     if (!c || !image) return null;
     await tx.campaignImage.updateMany({ where: { campaignId }, data: { selected: false } });
-    await tx.campaignImage.update({ where: { id: imageId }, data: { selected: true } });
+    await tx.campaignImage.update({ where: { id: imageId }, data: { selected: true, ...(framing !== undefined ? { framing: framingValue(framing) } : {}) } });
     return { brandId: c.brandId, batchId: c.batchId };
   });
 }
@@ -187,4 +193,27 @@ export async function brandForImages(_scope: TeamScope, brandId: string): Promis
 
 export async function campaignBrand(_scope: TeamScope, campaignId: string): Promise<string | null> {
   return (await prisma.campaign.findUnique({ where: { id: campaignId }, select: { brandId: true } }))?.brandId ?? null;
+}
+
+// ─── Framing ────────────────────────────────────────────────────────────────
+
+/** Where a campaign image sits in its tile; null is the centre crop. */
+export async function frameCampaignImage(_scope: TeamScope, imageId: string, framing: Framing | null): Promise<Written> {
+  return prisma.$transaction(async (tx) => {
+    const image = await tx.campaignImage.findUnique({ where: { id: imageId }, select: { campaignId: true } });
+    const c = image ? await campaignOwner(tx, image.campaignId) : null;
+    if (!c) return null;
+    await tx.campaignImage.update({ where: { id: imageId }, data: { framing: framingValue(framing) } });
+    return { brandId: c.brandId, batchId: c.batchId };
+  });
+}
+
+/** Where a cover sits in its card; null is the centre crop. Only covers are framed (logos aren't cropped). */
+export async function frameCandidate(_scope: TeamScope, candidateId: string, framing: Framing | null): Promise<Written> {
+  return prisma.$transaction(async (tx) => {
+    const c = await tx.candidate.findFirst({ where: { id: candidateId, field: "cover" }, select: { brandId: true } });
+    if (!c) return null;
+    await tx.candidate.update({ where: { id: candidateId }, data: { framing: framingValue(framing) } });
+    return owner(tx, c.brandId);
+  });
 }

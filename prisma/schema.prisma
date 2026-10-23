@@ -146,6 +146,8 @@ model Candidate {
   reason     String
   createdAt  DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
   selections Selection[]
+  /// Where a cover sits in its 16:11 frame ({ zoom, x, y }, lib/images/framing.ts); null: centred.
+  framing    Json?
 
   @@index([brandId])
   @@map("candidates")
@@ -193,6 +195,8 @@ model CampaignImage {
   selected   Boolean         @default(false)
   /// The reviewer's order of a campaign's images (dragged in the editor).
   position   Int             @default(0)
+  /// Where it sits in the 200:236 campaign tile ({ zoom, x, y }, lib/images/framing.ts); null: centred.
+  framing    Json?
 
   @@index([campaignId])
   @@map("campaign_images")
