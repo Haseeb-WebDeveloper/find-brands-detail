@@ -80,10 +80,34 @@ describe("campaign images", () => {
 });
 
 describe("owner's rules (2026-10-21)", () => {
-  it("rejects a portrait or square cover", () => {
-    expect(scoreImage(cand({ slot: "cover", w: 1080, h: 1350 }), NOW)).toEqual({ score: "rejected", reason: "1080×1350: not a landscape image." });
-    expect(scoreImage(cand({ slot: "cover", w: 1200, h: 1200 }), NOW).score).toBe("rejected");
+  it("lets a portrait or square cover be used, cut to the card, after a look (owner, 2026-10-23)", () => {
+    expect(scoreImage(cand({ slot: "cover", w: 1080, h: 1350 }), NOW)).toEqual({
+      score: "review",
+      reason: "1080×1350 from jumiso.us: portrait, so the 16:11 cover card cuts a strip from it. Open it full screen to frame it.",
+    });
+    expect(scoreImage(cand({ slot: "cover", w: 1200, h: 1200 }), NOW).score).toBe("review");
     expect(scoreImage(cand({ slot: "cover", w: 1200, h: 628 }), NOW).score).toBe("proven");
+  });
+
+  it("lets an image the site wouldn't give our server be used, after a look", () => {
+    const blocked = cand({ slot: "cover", ok: false, w: 0, h: 0, reason: "Upstream returned 403" });
+    blocked.check.status = 403;
+    const v = scoreImage(blocked, NOW);
+    expect(v.score).toBe("review");
+    expect(v.reason.startsWith("jumiso.us blocks servers from downloading it (403)")).toBe(true);
+    // Anything else that isn't an image stays out.
+    expect(scoreImage(cand({ slot: "cover", ok: false, w: 0, h: 0, reason: "Not an image" }), NOW).score).toBe("rejected");
+  });
+
+  it("always picks a cover when one can be used: a landscape one, then a portrait, then a blocked one", () => {
+    const blocked = cand({ url: "blocked", slot: "cover", ok: false, w: 0, h: 0, reason: "Upstream returned 403" });
+    blocked.check.status = 403;
+    const portrait = cand({ url: "portrait", slot: "cover", w: 3276, h: 4095, source: { kind: "instagram", label: "a post" } });
+    const wide = cand({ url: "wide", slot: "cover", w: 2000, h: 1100, source: { kind: "third_party", label: "mag.com" } });
+    const pick = (cs: ImageCandidate[]) => chooseImage(cs.map((c) => ({ candidate: c, verdict: scoreImage(c, NOW) })))?.url;
+    expect(pick([blocked, portrait, wide])).toBe("wide");
+    expect(pick([blocked, portrait])).toBe("portrait");
+    expect(pick([blocked])).toBe("blocked");
   });
 
   it("chooses the Instagram profile picture for the logo, then TikTok's, over a proven site logo", () => {

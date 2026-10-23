@@ -1,7 +1,7 @@
 import type { ImageCheckResult } from "@/lib/images/check-image";
 import { collectImages, type ImageLead, type ImagesInput } from "@/lib/images/collect";
 import { linkExpiry } from "@/lib/images/expiry";
-import { chooseImage, scoreImage, type ImageCandidate, type ImageVerdict } from "@/lib/images/score";
+import { chooseImage, isLandscapeCover, scoreImage, type ImageCandidate, type ImageVerdict } from "@/lib/images/score";
 import { rankCoverHits, type ImageHit } from "@/lib/images/search";
 import { domainMatchesBrand, registrableDomain } from "@/lib/website/domain";
 import { noLog, type ResearchLog } from "@/lib/research/log-types";
@@ -46,8 +46,9 @@ export async function researchImages(input: ImagesInput, deps: ImagesDeps, log: 
     );
     await check(slot, mine);
 
-    // No usable cover from the brand's pages: a wide image search (free, no AI).
-    if (slot === "cover" && !result.cover.scored.some((s) => s.verdict.score !== "rejected")) {
+    // No landscape cover from the brand's pages (portraits can be used, cut to the card, but a real banner
+    // is better): a wide image search (free, no AI).
+    if (slot === "cover" && !result.cover.scored.some((s) => s.verdict.score !== "rejected" && isLandscapeCover(s.candidate))) {
       const { hits, engine } = await deps.searchImages(`${input.brand} campaign banner`, { wide: true });
       const ranked = rankCoverHits(hits, input.brand, owned, SEARCH_CHECKS).filter((h) => !mine.some((l) => l.url === h.url));
       await log(
@@ -72,7 +73,7 @@ export async function researchImages(input: ImagesInput, deps: ImagesDeps, log: 
     result[slot].chosen = chosen;
     const verdict = result[slot].scored.find((s) => s.candidate === chosen)?.verdict;
     const rejected = result[slot].scored.filter((s) => s.verdict.score === "rejected").length;
-    if (rejected > 0) await log(`${rejected} ${slot} image${rejected === 1 ? " was" : "s were"} too small, not landscape, or not an image.`);
+    if (rejected > 0) await log(`${rejected} ${slot} image${rejected === 1 ? " was" : "s were"} too small or not an image.`);
     await log(
       chosen && verdict ? `${WORD[slot]}: ${verdict.reason}${verdict.score === "proven" ? "" : " Needs a look."}` : `No usable ${slot} image. Needs a look.`,
       verdict?.score === "proven" ? "good" : "warn",

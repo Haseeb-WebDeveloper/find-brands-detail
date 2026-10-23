@@ -1,7 +1,7 @@
 import type { FetchedPage } from "@/lib/website/judge";
 import type { ImageCheckResult } from "@/lib/images/check-image";
 import { linkExpiry } from "@/lib/images/expiry";
-import { chooseImage, scoreImage, type ImageCandidate, type ImageSource, type ImageVerdict } from "@/lib/images/score";
+import { chooseImage, isBlocked, scoreImage, type ImageCandidate, type ImageSource, type ImageVerdict } from "@/lib/images/score";
 import { domainMatchesBrand, registrableDomain } from "@/lib/website/domain";
 import { campaignsPrompt, parseCampaignsAnswer } from "@/lib/campaigns/find";
 import { readCampaignPage } from "@/lib/campaigns/page";
@@ -223,7 +223,8 @@ export async function researchCampaigns(input: CampaignsInput, deps: CampaignsDe
     await check(brandLeads, MAX_CHECKS);
 
     // Nothing usable from the brand: an image search (free, no AI), then the press pages' images.
-    if (!images.some((i) => i.verdict.score !== "rejected")) {
+    // A blocked image (the host refuses servers) is usable after a look, but not a reason to stop looking.
+    if (!images.some((i) => i.verdict.score !== "rejected" && !isBlocked(i.candidate))) {
       const words = distinctiveWords(c.title, input.brand);
       const { hits, engine } = await deps.searchImages(`${input.brand} ${c.title} campaign`);
       const ranked = rankHits(hits, words, owned, SEARCH_CHECKS);
