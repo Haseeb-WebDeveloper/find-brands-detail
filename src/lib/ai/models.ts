@@ -157,7 +157,10 @@ export async function askWithSearch(
   prompt: string,
   { what, effort, log = noLog, accept = () => true }: { what: string; effort: Effort; log?: ResearchLog; accept?: (text: string) => boolean },
 ): Promise<string | null> {
-  for (const m of models()) {
+  const available = models();
+  // Every key over its limit (each rests 30 minutes): said, so an empty result is never a mystery.
+  if (available.length === 0) await log(`Every AI key is over its limit right now, so ${what} weren't searched.`, "warn");
+  for (const m of available) {
     try {
       await log(`Searching the web for ${what} with ${m.label}. This can take a minute…`);
       const text = await attempt(m, "search", what, () => m.search(prompt, effort), accept);

@@ -11,6 +11,7 @@ import { useToast } from "@/design/toast";
 import { cn } from "@/design/cn";
 import type { CampaignCard } from "@/lib/brands/scoped";
 import { ImageViewer } from "@/components/app/review/image-viewer";
+import { FindMoreCampaignsButton } from "@/components/app/research/find-more-button";
 import {
   addCampaign,
   addCampaignImage,
@@ -278,7 +279,8 @@ function AddTile({ brandId }: { brandId: string }) {
  * Campaigns as tiles, in the export's order: drag a tile to move it; ✓ in the export, + left out; a
  * tile's title opens it to edit its text and images.
  */
-export function CampaignEditor({ brandId, campaigns, canEdit }: { brandId: string; campaigns: CampaignCard[]; canEdit: boolean }) {
+/** `findMore`: offer "Find more campaigns" (research done, not reviewed, a model set up). */
+export function CampaignEditor({ brandId, campaigns, canEdit, findMore = false }: { brandId: string; campaigns: CampaignCard[]; canEdit: boolean; findMore?: boolean }) {
   const [, run] = useRun();
   const sensors = useDragSensors();
   const [order, setOrder] = useOrder(campaigns.map((c) => c.id));
@@ -295,11 +297,14 @@ export function CampaignEditor({ brandId, campaigns, canEdit }: { brandId: strin
 
   return (
     <section className="flex flex-col gap-3">
-      <h2 className="flex items-baseline gap-2 text-headline text-label">
-        Campaigns
-        <span className={cn("text-subhead font-normal", included < 3 ? "text-system-orange" : "text-label-secondary")}>{included} in</span>
-        {canEdit && campaigns.length > 1 ? <span className="text-footnote font-normal text-label-tertiary">· drag to reorder</span> : null}
-      </h2>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="flex items-baseline gap-2 text-headline text-label">
+          Campaigns
+          <span className={cn("text-subhead font-normal", included < 3 ? "text-system-orange" : "text-label-secondary")}>{included} in</span>
+          {canEdit && campaigns.length > 1 ? <span className="text-footnote font-normal text-label-tertiary">· drag to reorder</span> : null}
+        </h2>
+        {findMore ? <FindMoreCampaignsButton brandId={brandId} /> : null}
+      </div>
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
         <SortableContext items={order} strategy={rectSortingStrategy}>
           <div className="grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-4">

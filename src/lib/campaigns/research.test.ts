@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { researchCampaigns, type CampaignsDeps } from "@/lib/campaigns/research";
+import { NO_MODEL_NOTE, isKnownCampaign, researchCampaigns, writeDescriptions, type CampaignsDeps } from "@/lib/campaigns/research";
 import type { FetchedPage } from "@/lib/website/judge";
 import type { ImageCheckResult } from "@/lib/images/check-image";
 
@@ -40,6 +40,7 @@ function deps() {
       ],
       engine: "DuckDuckGo" as string | null,
     })),
+    searchDescribe: vi.fn(async (_prompt: string, _log: unknown): Promise<string | null> => null),
   } satisfies CampaignsDeps;
 }
 
@@ -115,5 +116,62 @@ describe("researchCampaigns", () => {
     const d = deps();
     d.search.mockResolvedValueOnce(null);
     expect(await researchCampaigns(input, d)).toEqual([]);
+  });
+
+  it("looking for more, skips the campaigns the brand already has", async () => {
+    const d = deps();
+    const r = await researchCampaigns({ ...input, known: ["V&YOU — Let's Radiate"] }, d, undefined, NOW);
+    expect(r.map((c) => c.title)).toEqual(["World Tour; The First Light"]);
+    expect(d.search.mock.calls[0][0]).toContain(`list only OTHER campaigns, not these: "V&YOU — Let's Radiate"`);
+  });
+
+  it("says so when everything it lists is already here", async () => {
+    const d = deps();
+    const lines: string[] = [];
+    const r = await researchCampaigns({ ...input, known: ["V&YOU: Let's Radiate", "Invented", "World Tour; The First Light"] }, d, async (m) => void lines.push(m), NOW);
+    expect(r).toEqual([]);
+    expect(lines).toContain("No new campaigns found: the ones listed are already here. Add more by hand during review.");
+  });
+});
+
+describe("isKnownCampaign", () => {
+  it("matches the same title written differently, or one inside the other", () => {
+    expect(isKnownCampaign("V&YOU: Let's Radiate", ["v&you — let's radiate"])).toBe(true);
+    expect(isKnownCampaign("Mochi Musk Launch", ["Mochi Musk"])).toBe(true);
+    expect(isKnownCampaign("Rose Magnitude", ["Pacific Rock Flower"])).toBe(false);
+    expect(isKnownCampaign("Rose", ["Rose Magnitude"])).toBe(false);
+  });
+});
+
+describe("writeDescriptions", () => {
+  const items = [
+    { title: "Lucky One", date: "2024-03", text: "Lucky One launch with Cannes visuals. Shot on the Croisette.", sources: ["https://hfcparis.com/lucky"] },
+    { title: "Venice", date: "2026-09", text: "Banner.", sources: ["https://hfcparis.com/venice"] },
+  ];
+
+  it("searches the web for the ones the pages were too thin for", async () => {
+    const d = deps();
+    d.write.mockResolvedValueOnce(JSON.stringify({ descriptions: ["Lucky One, launched in Cannes.", ""] }));
+    d.write.mockResolvedValueOnce(JSON.stringify({ descriptions: [""] }));
+    d.searchDescribe.mockResolvedValueOnce(JSON.stringify({ descriptions: ["A Venice Film Festival perfumery experience."] }));
+    const w = await writeDescriptions("HFC", items, d);
+    expect(w.map((x) => x.description)).toEqual(["Lucky One, launched in Cannes.", "A Venice Film Festival perfumery experience."]);
+    expect(d.searchDescribe).toHaveBeenCalledTimes(1);
+    expect(d.searchDescribe.mock.calls[0][0]).toContain("1. Venice (2026-09)");
+  });
+
+  it("says no model could answer, instead of leaving them empty without a word", async () => {
+    const d = deps();
+    d.write.mockResolvedValue(null);
+    const lines: string[] = [];
+    const w = await writeDescriptions("HFC", items, d, async (m) => void lines.push(m));
+    expect(w).toEqual([
+      { description: "", descriptionNote: NO_MODEL_NOTE },
+      { description: "", descriptionNote: NO_MODEL_NOTE },
+    ]);
+    expect(lines.at(-1)).toBe(`Couldn't write the campaign descriptions. ${NO_MODEL_NOTE}`);
+    // Every model is over its limit: no point asking again, or searching.
+    expect(d.write).toHaveBeenCalledTimes(1);
+    expect(d.searchDescribe).not.toHaveBeenCalled();
   });
 });

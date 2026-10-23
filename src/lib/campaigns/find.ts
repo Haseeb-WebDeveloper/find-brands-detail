@@ -11,7 +11,7 @@ const MAX = 8;
 /** Spec §3: sales and promotions are not campaigns, whatever the model calls them. */
 const NOT_A_CAMPAIGN = /\b(promotions?|sales?|discounts?|giveaways?|coupons?|deals?)\b|% off\b/i;
 
-export function campaignsPrompt({ brand, site, instagram }: { brand: string; site: string | null; instagram: string | null }): string {
+export function campaignsPrompt({ brand, site, instagram, known = [] }: { brand: string; site: string | null; instagram: string | null; known?: string[] }): string {
   const about = [site ? `official site ${site}` : null, instagram ? `Instagram @${instagram}` : null].filter(Boolean).join(", ");
   return (
     `List the visual marketing campaigns of the beauty brand "${brand}"${about ? ` (${about})` : ""}, most recent first, up to ${MAX}. ` +
@@ -19,6 +19,7 @@ export function campaignsPrompt({ brand, site, instagram }: { brand: string; sit
     `Skip sales, discounts, retail expansion and promotions without imagery. ` +
     `For each give: title (short, as the brand names it), date (YYYY-MM, or null), and sources: up to 3 URLs of pages that show the campaign imagery, ` +
     `the brand's own pages first (site, press release), then press articles. Only URLs you actually found; no social media links. ` +
+    (known.length > 0 ? `The brand already has these; list only OTHER campaigns, not these: ${known.map((k) => `"${k}"`).join(", ")}. ` : "") +
     `Answer with JSON only: {"campaigns":[{"title":"...","date":"YYYY-MM","sources":["https://..."]}]}`
   );
 }

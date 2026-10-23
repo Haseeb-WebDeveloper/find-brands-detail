@@ -23,13 +23,28 @@ export async function resetForRetry(_scope: TeamScope, brandId: string): Promise
 export async function queueAiFill(_scope: TeamScope, where: { brandId: string } | { batchId: string }): Promise<{ ids: string[]; batchIds: string[] }> {
   const brands = await prisma.brand.findMany({
     where: "brandId" in where ? { id: where.brandId } : { batchId: where.batchId },
-    select: { id: true, batchId: true, status: true, text: true, _count: { select: { campaigns: true } } },
+    select: { id: true, batchId: true, status: true, text: true, campaigns: { select: { status: true, description: true } } },
   });
-  const eligible = brands.filter((b) => canFillAi(b.status, missingAiParts(b._count.campaigns, b.text)));
+  const eligible = brands.filter((b) => canFillAi(b.status, missingAiParts(b.campaigns, b.text)));
   if (eligible.length === 0) return { ids: [], batchIds: [] };
   await prisma.brand.updateMany({ where: { id: { in: eligible.map((b) => b.id) } }, data: { status: "queued", currentStep: null, error: null } });
   for (const b of eligible) await announce(b.id, b.batchId, null);
   return { ids: eligible.map((b) => b.id), batchIds: [...new Set(eligible.map((b) => b.batchId))] };
+}
+
+/**
+ * Queues "Find more campaigns" for a brand whose research is done and that isn't reviewed yet (a
+ * reviewed brand stays as the reviewer left it; reopen it first).
+ */
+export async function queueMoreCampaigns(_scope: TeamScope, brandId: string): Promise<{ ok: true; batchId: string } | { ok: false; error: string }> {
+  const brand = await prisma.brand.findUnique({ where: { id: brandId }, select: { batchId: true, status: true } });
+  if (!brand) return { ok: false, error: "That brand doesn't exist." };
+  if (brand.status !== "needs_review") {
+    return { ok: false, error: brand.status === "queued" || brand.status === "researching" ? "Research is still running." : "Reopen the brand to look for more campaigns." };
+  }
+  await prisma.brand.update({ where: { id: brandId }, data: { status: "queued", currentStep: null, error: null } });
+  await announce(brandId, brand.batchId, null);
+  return { ok: true, batchId: brand.batchId };
 }
 
 /** The functions below are called only by the research job (Inngest), so they take no scope. */

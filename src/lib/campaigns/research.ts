@@ -8,15 +8,24 @@ import { readCampaignPage } from "@/lib/campaigns/page";
 import { distinctiveWords, matchPosts, pageMentions } from "@/lib/campaigns/posts";
 import type { IgPost } from "@/lib/instagram/history";
 import { rankHits, type ImageHit } from "@/lib/images/search";
-import { cutToSentence, DESCRIPTION_MAX, describePrompt, parseDescriptions, shortenPrompt } from "@/lib/campaigns/describe";
+import { cutToSentence, DESCRIPTION_MAX, describePrompt, describeWithSearchPrompt, parseDescriptions, shortenPrompt } from "@/lib/campaigns/describe";
 import { noLog, type ResearchLog } from "@/lib/research/log-types";
 
-export type CampaignsInput = { brand: string; site: string | null; brandDomains: string[]; instagram: { handle: string } | null };
+export type CampaignsInput = {
+  brand: string;
+  site: string | null;
+  brandDomains: string[];
+  instagram: { handle: string } | null;
+  /** Titles the brand already has, when looking for more: the search skips them. */
+  known?: string[];
+};
 
 /** The network and the models, injected so the logic is tested with fakes. */
 export type CampaignsDeps = {
   search(prompt: string, log: ResearchLog): Promise<string | null>;
   write(prompt: string): Promise<string | null>;
+  /** A web-searching model, for descriptions whose source pages are too thin. */
+  searchDescribe(prompt: string, log: ResearchLog): Promise<string | null>;
   fetchPage(url: string): Promise<FetchedPage>;
   checkImage(url: string): Promise<ImageCheckResult>;
   /** The brand's Instagram posts back to `since` (null: the latest ones). */
@@ -53,11 +62,101 @@ export function postsSince(found: { date: string | null }[]): Date | null {
 }
 const host = (url: string) => new URL(url).hostname.replace(/^www\./, "");
 
+export type WrittenDescription = { description: string; descriptionNote: string | null };
+
+/** Said in the log and on each empty campaign when no model answered at all. */
+export const NO_MODEL_NOTE = "No AI model could answer (every key was over its limit). Use Fill in missing AI parts later.";
+
+/**
+ * Descriptions for campaigns, one per item in order. Used by research and by Fill (only for the
+ * campaigns with an empty description; it never touches the others).
+ *
+ * 1. One call for all of them, written from their source pages' text.
+ * 2. The ones the model skipped are asked once more.
+ * 3. Still empty means the pages were too thin to write from (the prompt says to leave those empty):
+ *    the model searches the web for just those.
+ * 4. Over 500 characters is re-requested shorter, then cut at a sentence (spec §7).
+ *
+ * When no model answered at all (every key over its limit or resting), it says so instead of
+ * leaving the descriptions empty without a word.
+ */
+export async function writeDescriptions(
+  brand: string,
+  items: { title: string; date: string | null; text: string; sources: string[] }[],
+  deps: Pick<CampaignsDeps, "write" | "searchDescribe">,
+  log: ResearchLog = noLog,
+): Promise<WrittenDescription[]> {
+  if (items.length === 0) return [];
+  await log(items.length === 1 ? `Writing the description of "${items[0].title}"…` : "Writing the campaign descriptions…");
+  let answered = false;
+  const ask = async (prompt: string) => {
+    const text = await deps.write(prompt);
+    if (text !== null) answered = true;
+    return text ?? "";
+  };
+  const written = parseDescriptions(await ask(describePrompt(brand, items)), items.length);
+  const empty = () => items.map((c, i) => ({ c, i })).filter(({ i }) => !written[i]);
+
+  // The model sometimes skips one: ask once more for just those.
+  let missing = empty();
+  if (missing.length > 0 && answered) {
+    const again = parseDescriptions(await ask(describePrompt(brand, missing.map(({ c }) => c))), missing.length);
+    missing.forEach(({ i }, n) => (written[i] = again[n]));
+  }
+
+  missing = empty();
+  if (missing.length > 0 && answered) {
+    await log(
+      `${missing.length === 1 ? `"${missing[0].c.title}" had` : `${missing.length} campaigns had`} too little on ${missing.length === 1 ? "its" : "their"} pages to write from; searching the web instead.`,
+    );
+    const found = parseDescriptions((await deps.searchDescribe(describeWithSearchPrompt(brand, missing.map(({ c }) => c)), log)) ?? "", missing.length);
+    missing.forEach(({ i }, n) => (written[i] = found[n]));
+  }
+  if (!answered) await log(`Couldn't write the campaign descriptions. ${NO_MODEL_NOTE}`, "warn");
+
+  const out: WrittenDescription[] = [];
+  for (const [i, c] of items.entries()) {
+    let description = written[i] ?? "";
+    let descriptionNote: string | null = description ? null : answered ? "Nothing to write from yet. Write it during review." : NO_MODEL_NOTE;
+    if (description.length > DESCRIPTION_MAX) {
+      const shorter = (await deps.write(shortenPrompt(brand, c.title, description)))?.trim() ?? "";
+      if (shorter && shorter.length <= DESCRIPTION_MAX) {
+        description = shorter;
+      } else {
+        description = cutToSentence(shorter || description);
+        descriptionNote = "Shortened to fit 500 characters; check the ending.";
+      }
+    }
+    out.push({ description, descriptionNote });
+  }
+  return out;
+}
+
+/** Whether a found title is one the brand already has: the same words, or one inside the other. */
+export function isKnownCampaign(title: string, known: string[]): boolean {
+  const norm = (s: string) => s.toLowerCase().normalize("NFKD").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+  const t = norm(title);
+  return known.some((k) => {
+    const n = norm(k);
+    return n.length > 0 && (n === t || (n.length >= 6 && t.includes(n)) || (t.length >= 6 && n.includes(t)));
+  });
+}
+
 export async function researchCampaigns(input: CampaignsInput, deps: CampaignsDeps, log: ResearchLog = noLog, now = new Date()): Promise<ResearchedCampaign[]> {
-  const text = await deps.search(campaignsPrompt({ brand: input.brand, site: input.site, instagram: input.instagram?.handle ?? null }), log);
-  const found = text ? parseCampaignsAnswer(text) : [];
+  const known = input.known ?? [];
+  const text = await deps.search(campaignsPrompt({ brand: input.brand, site: input.site, instagram: input.instagram?.handle ?? null, known }), log);
+  const listed = text ? parseCampaignsAnswer(text) : [];
+  // Looking for more: the ones the brand already has are dropped, whatever the model says.
+  const found = listed.filter((c) => !isKnownCampaign(c.title, known));
   if (found.length === 0) {
-    await log("No campaigns found. Add them by hand during review.", "warn");
+    await log(
+      known.length > 0
+        ? listed.length > 0
+          ? "No new campaigns found: the ones listed are already here. Add more by hand during review."
+          : "No more campaigns found. Add more by hand during review."
+        : "No campaigns found. Add them by hand during review.",
+      "warn",
+    );
     return [];
   }
   await log(`Found ${found.length} possible campaign${found.length === 1 ? "" : "s"}: ${found.map((c) => c.title).join(", ")}.`);
@@ -155,30 +254,8 @@ export async function researchCampaigns(input: CampaignsInput, deps: CampaignsDe
   }
   if (kept.length === 0) return [];
 
-  await log("Writing the campaign descriptions…");
-  const written = parseDescriptions((await deps.write(describePrompt(input.brand, kept))) ?? "", kept.length);
-  // The model sometimes skips one: ask once more for just those.
-  const missing = kept.map((c, i) => ({ c, i })).filter(({ i }) => !written[i]);
-  if (missing.length > 0) {
-    const again = parseDescriptions((await deps.write(describePrompt(input.brand, missing.map(({ c }) => c)))) ?? "", missing.length);
-    missing.forEach(({ i }, n) => (written[i] = again[n]));
-  }
-  const out: ResearchedCampaign[] = [];
-  for (const [i, { text: _text, ...c }] of kept.entries()) {
-    let description = written[i] ?? "";
-    let descriptionNote: string | null = description ? null : "Nothing to write from yet. Write it during review.";
-    if (description.length > DESCRIPTION_MAX) {
-      // Spec §7: over the limit is re-requested shorter before review.
-      const shorter = (await deps.write(shortenPrompt(input.brand, c.title, description)))?.trim() ?? "";
-      if (shorter && shorter.length <= DESCRIPTION_MAX) {
-        description = shorter;
-      } else {
-        description = cutToSentence(shorter || description);
-        descriptionNote = "Shortened to fit 500 characters; check the ending.";
-      }
-    }
-    out.push({ ...c, description, descriptionNote });
-  }
+  const written = await writeDescriptions(input.brand, kept, deps, log);
+  const out: ResearchedCampaign[] = kept.map(({ text: _text, ...c }, i) => ({ ...c, ...written[i] }));
   // Most recent first (spec §3); undated last, keeping the order they were found.
   return out
     .map((c, i) => ({ c, i }))

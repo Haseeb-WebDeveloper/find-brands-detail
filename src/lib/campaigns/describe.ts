@@ -23,6 +23,22 @@ export function describePrompt(brand: string, items: { title: string; date: stri
   );
 }
 
+/**
+ * For campaigns whose source pages were too thin to write from (a banner, a one-line press page): the
+ * model searches the web for each and writes from what it finds, with the same rules and format.
+ */
+export function describeWithSearchPrompt(brand: string, items: { title: string; date: string | null; sources: string[] }[]): string {
+  const list = items.map((c, i) => `${i + 1}. ${c.title}${c.date ? ` (${c.date})` : ""}${c.sources.length ? ` — seen on ${c.sources.join(", ")}` : ""}`).join("\n");
+  return (
+    `Search the web for each campaign of the beauty brand "${brand}" below, then write one description of 300 to ${TARGET} characters ` +
+    `(at most ${TARGET} characters) for each: first what the campaign shows (who, the visual idea, the setting), then why it matters for the brand. ` +
+    `Plain, analytical English; no hashtags, no emojis, no marketing superlatives. Use only facts you found. ` +
+    `Never guess or hedge (no "likely", "presumably", "may", "appears to"). If you find fewer than two facts about a campaign, give an empty string for it. ` +
+    // Not "answer with JSON": beside the search tool, that wording makes the model call a "json" tool that doesn't exist.
+    `Use the search tool only to search. Then reply in plain text with this object and nothing else: {"descriptions":["...", "..."]}, in the same order.\n\n${list}`
+  );
+}
+
 export function shortenPrompt(brand: string, title: string, description: string): string {
   return `Shorten this description of ${brand}'s campaign "${title}" to at most ${TARGET} characters, keeping its facts and tone. Answer with the text only.\n\n${description}`;
 }

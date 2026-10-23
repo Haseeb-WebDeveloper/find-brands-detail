@@ -93,7 +93,7 @@ export async function getBatch(
       where: { brand: { batchId: id } },
       select: { brandId: true, field: true, typedValue: true, candidate: { select: { value: true, score: true, evidence: true } } },
     }),
-    prisma.campaign.findMany({ where: { brand: { batchId: id } }, select: { brandId: true, status: true } }),
+    prisma.campaign.findMany({ where: { brand: { batchId: id } }, select: { brandId: true, status: true, description: true } }),
     prisma.researchLog.findMany({
       where: { batchId: id },
       orderBy: { createdAt: "desc" },
@@ -124,7 +124,7 @@ export async function getBatch(
         chosen: Object.fromEntries(REVIEW_FIELDS.map((f) => [f, chosen(f)])) as BrandRow["chosen"],
         campaigns: { approved: camps.filter((c) => c.status === "approved").length, total: camps.filter((c) => c.status !== "removed").length },
         stuck: stuck.has(b.id),
-        missingAi: missingAiParts(camps.length, text),
+        missingAi: missingAiParts(camps, text),
       };
     }),
     log: log.map((l) => ({

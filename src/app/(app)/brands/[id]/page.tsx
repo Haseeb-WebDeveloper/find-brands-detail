@@ -18,7 +18,7 @@ import { progressText, progressTone } from "@/lib/brands/progress";
 import { RowsLoading } from "@/components/app/shell/page-skeletons";
 import { FillAiButton } from "@/components/app/research/fill-ai-button";
 import { aiAvailable } from "@/lib/ai/models";
-import { canFillAi } from "@/lib/research/ai-fill";
+import { canFillAi, fillLabel } from "@/lib/research/ai-fill";
 
 export const metadata: Metadata = { title: "Brand" };
 
@@ -40,7 +40,7 @@ async function Brand({ params }: { params: Promise<{ id: string }> }) {
   // Reviewing waits for research: its steps replace candidates and campaigns as they finish.
   const canEdit = scopeCan(scope, "batches:write") && !busy;
   const fill = scopeCan(scope, "batches:write") && aiAvailable() && canFillAi(brand.status, brand.missingAi);
-  const fillLabel = brand.missingAi.campaigns && brand.missingAi.details ? "Find campaigns and draft details" : brand.missingAi.campaigns ? "Find campaigns" : "Draft the missing details";
+  const fillText = fillLabel(brand.missingAi);
 
   return (
     <>
@@ -61,12 +61,12 @@ async function Brand({ params }: { params: Promise<{ id: string }> }) {
         <FieldsCard brand={brand} canEdit={canEdit} />
         {/* Keyed by brand, not by its text: a save must not reset the field being typed in next. */}
         <BrandTextForm key={brand.id} brandId={brand.id} initial={brand.text} canEdit={canEdit} />
-        <CampaignEditor brandId={brand.id} campaigns={brand.campaigns} canEdit={canEdit} />
+        <CampaignEditor brandId={brand.id} campaigns={brand.campaigns} canEdit={canEdit} findMore={canEdit && aiAvailable() && brand.status === "needs_review"} />
         <div className="flex flex-col gap-3">
           <ResearchLog lines={brand.log} live={researching} defaultOpen={researching} />
           {scopeCan(scope, "batches:write") && !researching ? (
             <div className="flex flex-wrap gap-2">
-              {fill ? <FillAiButton target={{ brandId: brand.id }} label={fillLabel} /> : null}
+              {fill ? <FillAiButton target={{ brandId: brand.id }} label={fillText} /> : null}
               <RetryButton brandId={brand.id} />
             </div>
           ) : null}

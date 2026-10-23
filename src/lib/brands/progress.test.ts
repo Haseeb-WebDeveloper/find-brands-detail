@@ -14,7 +14,7 @@ const base: BrandRow = {
   chosen: { website: null, instagram: null, tiktok: null, logo: null, cover: null },
   campaigns: { approved: 0, total: 0 },
   stuck: false,
-  missingAi: { campaigns: false, details: false },
+  missingAi: { campaigns: false, descriptions: false, details: false },
 };
 
 describe("progressText", () => {

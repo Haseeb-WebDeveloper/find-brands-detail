@@ -120,7 +120,7 @@ export async function getBrandDetail(_scope: TeamScope, id: string): Promise<Bra
     },
     siblings: siblings.map(({ id, name, status }) => ({ id, name, status })),
     stuck: stuckBrandIds(siblings, Date.now()).has(brand.id),
-    missingAi: missingAiParts(brand.campaigns.length, brand.text),
+    missingAi: missingAiParts(brand.campaigns, brand.text),
     log: brand.logs.map((l) => ({ id: l.id, brandId: l.brandId, brandName: brand.name, level: l.level as LogLevel, message: l.message, at: l.createdAt.toISOString() })),
   };
 }
