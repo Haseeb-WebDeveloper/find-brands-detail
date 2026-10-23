@@ -24,7 +24,7 @@ describe("parseSitesAnswer", () => {
 
 describe("findOfficialSites without an AI key", () => {
   it("says so and returns nothing, at once", async () => {
-    const vars = ["GROQ_API_KEY", "GROQ_API_KEY_2", "GROQ_API_KEY_3", "GOOGLE_GENERATIVE_AI_API_KEY"];
+    const vars = ["GROQ_API_KEY", "GROQ_API_KEY_2", "GROQ_API_KEY_3", "GROQ_API_KEY_4", "GOOGLE_GENERATIVE_AI_API_KEY"];
     const saved = Object.fromEntries(vars.map((v) => [v, process.env[v]]));
     for (const v of vars) delete process.env[v];
     try {
