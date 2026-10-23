@@ -7,6 +7,7 @@ import { IG_HANDLE_RE, TT_HANDLE_RE } from "@/lib/export/importer/platforms";
 import { linkExpiry } from "@/lib/images/expiry";
 import { scoreImage } from "@/lib/images/score";
 import type { ReviewField } from "@/lib/export/row";
+import { instagramPostLink, type PostImageResult, type PostLink } from "@/lib/instagram/post-image";
 
 export type TypedCheck = { value: string; score: "proven" | "review" | "rejected"; reason: string; evidence: Record<string, unknown> };
 
@@ -18,6 +19,7 @@ export type TypedDeps = {
   lookupBusiness(username: string): Promise<Discovery>;
   lookupProfile(username: string): Promise<TtLookup>;
   checkImage(url: string, slot: "logo" | "cover" | "campaign"): Promise<ImageCheckResult>;
+  resolvePost(link: PostLink): Promise<PostImageResult>;
 };
 
 const BY = "Typed by a reviewer.";
@@ -66,11 +68,25 @@ export async function checkTyped(field: ReviewField | "campaign", raw: string, d
       evidence: { followers: t.profile.followers, name: t.profile.name, verified: t.profile.verified, avatarUrl: t.profile.avatar },
     };
   }
-  const url = /^https?:\/\//i.test(input) ? asUrl(input) : null;
-  if (!url) return bad(input, "That isn't an image address. Right-click the image and copy its address.");
+  // An Instagram post's link stands for its image: the full-size slide it names (post-image.ts).
+  const post = instagramPostLink(input);
+  let from = "";
+  let fromPost: { post: string; owner: string | null } | null = null;
+  let url: string | null;
+  if (post) {
+    const found = await deps.resolvePost(post);
+    if (!found.ok) return bad(input, found.error);
+    url = found.image.url;
+    const who = found.owner ? `@${found.owner}'s` : "an";
+    from = `From ${who} Instagram post${found.slides > 1 ? `, image ${found.slide} of ${found.slides}` : ""}. `;
+    fromPost = { post: `https://www.instagram.com/p/${post.code}/`, owner: found.owner };
+  } else {
+    url = /^https?:\/\//i.test(input) ? asUrl(input) : null;
+  }
+  if (!url) return bad(input, "That isn't an image address. Paste an Instagram post's link, or right-click the image and copy its address.");
   const check = await deps.checkImage(url, field);
   const v = scoreImage({ slot: field, url, source: { kind: "site", label: "the reviewer" }, check, expiresAt: linkExpiry(url) }, now);
   // A typed logo can still need a look (too wide, or a link that expires): the reason says why.
-  const reason = v.score === "proven" ? `${BY} ${check.width}×${check.height}.` : `${BY} ${v.reason}`;
-  return { value: url, score: v.score, reason, evidence: { kind: "typed", width: check.width ?? null, height: check.height ?? null } };
+  const reason = v.score === "proven" ? `${BY} ${from}${check.width}×${check.height}.` : `${BY} ${from}${v.reason}`;
+  return { value: url, score: v.score, reason, evidence: { kind: "typed", width: check.width ?? null, height: check.height ?? null, ...fromPost } };
 }

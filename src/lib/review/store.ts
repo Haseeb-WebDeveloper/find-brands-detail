@@ -171,11 +171,18 @@ export async function addCampaign(
   });
 }
 
-/** The brand's name and its own domains, to label a reviewer's image as brand-owned or third-party. */
-export async function brandForImages(_scope: TeamScope, brandId: string): Promise<{ name: string; domains: string[] } | null> {
-  const b = await prisma.brand.findUnique({ where: { id: brandId }, select: { name: true, candidates: { where: { field: "website", score: { not: "rejected" } }, select: { value: true } } } });
+/** What decides whether a typed image is the brand's own: its sites' domains, and its chosen Instagram. */
+export async function brandForImages(_scope: TeamScope, brandId: string): Promise<{ name: string; domains: string[]; instagram: string | null } | null> {
+  const b = await prisma.brand.findUnique({
+    where: { id: brandId },
+    select: {
+      name: true,
+      candidates: { where: { field: "website", score: { not: "rejected" } }, select: { value: true } },
+      selections: { where: { field: "instagram" }, select: { candidate: { select: { value: true } } } },
+    },
+  });
   if (!b) return null;
-  return { name: b.name, domains: b.candidates.map((c) => new URL(c.value).hostname) };
+  return { name: b.name, domains: b.candidates.map((c) => new URL(c.value).hostname), instagram: b.selections[0]?.candidate?.value.toLowerCase() ?? null };
 }
 
 export async function campaignBrand(_scope: TeamScope, campaignId: string): Promise<string | null> {

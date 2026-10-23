@@ -37,8 +37,8 @@ const PLACEHOLDER: Record<ReviewField, string> = {
   website: "Website address",
   instagram: "Instagram handle or link",
   tiktok: "TikTok handle or link",
-  logo: "Image address (right-click the image → Copy image address)",
-  cover: "Image address (right-click the image → Copy image address)",
+  logo: "Instagram post link, or image address (right-click → Copy image address)",
+  cover: "Instagram post link, or image address (right-click → Copy image address)",
 };
 
 /** The reviewer's own value, checked at once and then chosen (spec §8). */

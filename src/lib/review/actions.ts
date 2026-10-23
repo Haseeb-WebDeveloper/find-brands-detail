@@ -28,6 +28,7 @@ import { judgeSite } from "@/lib/website/judge";
 import { lookupBusiness } from "@/lib/instagram/discovery";
 import { lookupProfile } from "@/lib/tiktok/profile";
 import { checkImageUrl } from "@/lib/images/check-image";
+import { resolvePostImage } from "@/lib/instagram/post-image";
 import { domainMatchesBrand, registrableDomain } from "@/lib/website/domain";
 
 type Result = { ok: true } | { ok: false; error: string };
@@ -42,15 +43,21 @@ function refresh(written: NonNullable<Written>) {
   revalidatePath(`/batches/${written.batchId}`);
 }
 
-const deps = (brand: string): TypedDeps => ({ brand, fetchPage, judgeSite, lookupBusiness, lookupProfile, checkImage: checkImageUrl });
+const deps = (brand: string): TypedDeps => ({ brand, fetchPage, judgeSite, lookupBusiness, lookupProfile, checkImage: checkImageUrl, resolvePost: resolvePostImage });
 
-/** Checks a reviewer's campaign image and labels it brand-owned or third-party by its domain. */
-async function checkCampaignImage(brand: { name: string; domains: string[] }, url: string): Promise<CheckedImage | { error: string }> {
+/**
+ * Checks a reviewer's campaign image (an image address, or an Instagram post's link) and labels it
+ * brand-owned or third-party: by its domain, or for a post, by whether the brand's chosen Instagram
+ * account posted it.
+ */
+async function checkCampaignImage(brand: { name: string; domains: string[]; instagram: string | null }, url: string): Promise<CheckedImage | { error: string }> {
   const check = await checkTyped("campaign", url, deps(brand.name));
   if (check.score === "rejected") return { error: check.reason.replace(/^Typed by a reviewer\. /, "") };
+  const e = check.evidence as { width?: number | null; height?: number | null; post?: string; owner?: string | null };
   const host = new URL(check.value).hostname;
-  const owned = brand.domains.some((d) => registrableDomain(d) === registrableDomain(host)) || domainMatchesBrand(host, brand.name);
-  const e = check.evidence as { width?: number | null; height?: number | null };
+  const owned = e.post
+    ? Boolean(e.owner && e.owner === brand.instagram)
+    : brand.domains.some((d) => registrableDomain(d) === registrableDomain(host)) || domainMatchesBrand(host, brand.name);
   return { url: check.value, sourceKind: owned ? "brand" : "third_party", width: e.width ?? null, height: e.height ?? null, score: owned ? check.score : "review", reason: check.reason };
 }
 

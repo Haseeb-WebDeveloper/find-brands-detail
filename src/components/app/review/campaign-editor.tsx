@@ -154,7 +154,7 @@ function EditDialog({ c, open, onOpenChange }: { c: CampaignCard; open: boolean;
           </div>
         ) : null}
         <div className="flex items-end gap-2">
-          <TextField label="Another image" placeholder="Image address" value={imageUrl} onChange={(e) => setImageUrl(e.currentTarget.value)} className="flex-1" />
+          <TextField label="Another image" placeholder="Instagram post link or image address" value={imageUrl} onChange={(e) => setImageUrl(e.currentTarget.value)} className="flex-1" />
           <button
             type="button"
             disabled={pending || !imageUrl.trim()}
@@ -268,7 +268,7 @@ function AddTile({ brandId }: { brandId: string }) {
         <div className="flex flex-col gap-3">
           <TextField label="Title" value={form.title} onChange={(e) => setForm({ ...form, title: e.currentTarget.value })} />
           <Description value={form.description} onChange={(description) => setForm({ ...form, description })} />
-          <TextField label="Image address" placeholder="https://…" value={form.imageUrl} onChange={(e) => setForm({ ...form, imageUrl: e.currentTarget.value })} />
+          <TextField label="Image" placeholder="Instagram post link or image address" value={form.imageUrl} onChange={(e) => setForm({ ...form, imageUrl: e.currentTarget.value })} />
         </div>
       </Dialog>
     </>
