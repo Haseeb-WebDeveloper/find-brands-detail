@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { getTeamScope, scopeCan } from "@/lib/auth/scope";
 import { parseBatchInput } from "@/lib/batches/parse-input";
 import { cleanBatchName } from "@/lib/batches/name";
-import { createBatchWithBrands } from "@/lib/batches/store";
+import { createBatchWithBrands, deleteBatchIfIdle } from "@/lib/batches/store";
+import { deleteBlocker } from "@/lib/batches/delete";
 import { inngest } from "@/lib/inngest/client";
 import { brandResearchEvent } from "@/lib/inngest/events";
 
@@ -26,4 +27,20 @@ export async function startBatch(text: string, name: string): Promise<{ ok: true
   }
   revalidatePath("/batches");
   return { ok: true, batchId };
+}
+
+/** Deletes a batch and its brands for good; refused while any of its brands is still being researched. */
+export async function deleteBatch(batchId: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  const scope = await getTeamScope();
+  if (!scope || !scopeCan(scope, "batches:write")) return { ok: false, error: "You can't delete batches." };
+
+  try {
+    const result = await deleteBatchIfIdle(scope, batchId, (brands) => deleteBlocker(brands, Date.now()));
+    if (!result.ok) return result;
+  } catch (error) {
+    console.error("[batches] could not delete a batch", error);
+    return { ok: false, error: "The batch couldn't be deleted. Try again in a minute." };
+  }
+  revalidatePath("/batches");
+  return { ok: true };
 }

@@ -14,6 +14,7 @@ import { ProgressBar } from "@/components/app/research/progress-bar";
 import { BatchList } from "@/components/app/review/batch-list";
 import { ExportButton } from "@/components/app/review/export-dialog";
 import { FillAiButton } from "@/components/app/research/fill-ai-button";
+import { DeleteBatchButton } from "@/components/app/review/delete-batch-button";
 import { aiAvailable } from "@/lib/ai/models";
 import { canFillAi } from "@/lib/research/ai-fill";
 import { batchTitle } from "@/lib/batches/name";
@@ -43,6 +44,7 @@ async function Batch({ params }: { params: Promise<{ id: string }> }) {
         actions={
           <div className="flex items-center gap-2">
             {toFill > 0 && !running ? <FillAiButton target={{ batchId: batch.id }} label={`Fill in missing AI parts (${toFill})`} /> : null}
+            {scopeCan(scope, "batches:write") ? <DeleteBatchButton batchId={batch.id} batchName={batchTitle(batch)} brandCount={total} /> : null}
             {scopeCan(scope, "batches:write") ? <ExportButton batchName={batchTitle(batch)} brands={batch.brands.map((b) => ({ id: b.id, name: b.name, status: b.status }))} /> : null}
             {next ? (
               <Button kind="filled" href={`/brands/${next.id}`}>
