@@ -7,10 +7,10 @@ import { recordAiCall } from "@/lib/usage/store";
 type Effort = "low" | "medium";
 
 /**
- * Groq keys in the order they're used: GROQ_API_KEY, then GROQ_API_KEY_2 to _4. Each has
+ * Groq keys in the order they're used: GROQ_API_KEY, then GROQ_API_KEY_2 to _6. Each has
  * its own quota, so one over its limit hands over to the next.
  */
-const GROQ_KEY_VARS = ["GROQ_API_KEY", "GROQ_API_KEY_2", "GROQ_API_KEY_3", "GROQ_API_KEY_4"] as const;
+const GROQ_KEY_VARS = ["GROQ_API_KEY", "GROQ_API_KEY_2", "GROQ_API_KEY_3", "GROQ_API_KEY_4", "GROQ_API_KEY_5", "GROQ_API_KEY_6"] as const;
 const groqKeys = () =>
   GROQ_KEY_VARS.map((v, n) => ({ label: n === 0 ? "Groq" : `Groq ${n + 1}`, key: process.env[v] })).filter((k): k is { label: string; key: string } => Boolean(k.key));
 
