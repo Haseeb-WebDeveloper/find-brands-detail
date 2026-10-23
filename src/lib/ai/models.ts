@@ -21,6 +21,11 @@ const groqKeys = () =>
 export function aiAvailable(): boolean {
   return groqKeys().length > 0 || Boolean(process.env.GOOGLE_GENERATIVE_AI_API_KEY);
 }
+/** The keys this deployment has, by label, in the order they're tried (names only, never the keys). */
+export function configuredKeys(): string[] {
+  return [...groqKeys().map((k) => k.label), ...(process.env.GOOGLE_GENERATIVE_AI_API_KEY ? ["Gemini"] : [])];
+}
+
 const TIMEOUT_MS = 120_000;
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
 const isQuota = (error: unknown) => isQuotaError(message(error));

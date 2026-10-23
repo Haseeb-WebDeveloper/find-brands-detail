@@ -9,6 +9,7 @@ import { Section } from "@/design/rows";
 import { requireMember } from "@/lib/auth/scope";
 import { formatShortDate } from "@/lib/format";
 import { USAGE_DAYS, readUsage } from "@/lib/usage/scoped";
+import { configuredKeys } from "@/lib/ai/models";
 import type { KeyDay } from "@/lib/usage/rules";
 
 export const metadata: Metadata = { title: "AI usage" };
@@ -31,10 +32,34 @@ function keyDayDetail(d: KeyDay): string {
 async function Usage() {
   const scope = await requireMember();
   const { keyDays, brands, perBrand, limitHits } = await readUsage(scope);
-  if (keyDays.length === 0) return <Empty icon="report" title={`No AI calls in the last ${USAGE_DAYS} days`} />;
+  // Every key this deployment has, used or not: a key added on Vercel shows here after the redeploy.
+  const keys = configuredKeys();
+  const calledToday = new Set(keyDays.filter((d) => d.day === keyDays[0]?.day).map((d) => d.provider));
+  const keysSet = (
+    <Section title="Keys set up" summary={`${keys.length} in the order they're tried`}>
+      <ListGroup>
+        {keys.length > 0 ? (
+          keys.map((k, i) => (
+            <ListRow key={k} first={i === 0} title={k} trailing={<span className="text-footnote text-label-secondary">{calledToday.has(k) ? "Used today" : "Not used today"}</span>} />
+          ))
+        ) : (
+          <ListRow first title="No AI key is set up" />
+        )}
+      </ListGroup>
+    </Section>
+  );
+  if (keyDays.length === 0) {
+    return (
+      <div className="flex flex-col gap-8">
+        {keysSet}
+        <Empty icon="report" title={`No AI calls in the last ${USAGE_DAYS} days`} />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-8">
+      {keysSet}
       <Section title="Per brand" summary={perBrand ? `Over ${n(perBrand.brands)} brands with an answer` : "No brand has an answer yet"}>
         {perBrand ? (
           <ListGroup>
